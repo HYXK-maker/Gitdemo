@@ -1,20 +1,16 @@
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
-import { fileURLToPath, URL } from 'node:url'
 
 export default defineConfig({
   plugins: [vue()],
-  resolve: {
-    alias: {
-      '@': fileURLToPath(new URL('./src', import.meta.url))
-    }
-  },
   server: {
-    port: 5173,
     proxy: {
+      // 把 /api 开头的请求转发到后端 http://localhost:8080
       '/api': {
-        target: 'http://localhost:8080',
-        changeOrigin: true
+        target: 'http://localhost:8080', // 后端基础地址
+        changeOrigin: true, // 必须开启，解决跨域问题
+        rewrite: (path) => path.replace(/^\/api/, '')
+        // 效果：前端请求 /api/user/register → 后端收到 /user/register
       }
     }
   }
