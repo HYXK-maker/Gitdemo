@@ -21,4 +21,21 @@ public class UserService {
         }
         return "login-success-token-" + user.getId();
     }
+
+    // 添加注册方法
+    public void register(String username, String password) {
+        // 1. 检查用户名是否已存在
+        User existingUser = userMapper.findByUsername(username);
+        if (existingUser != null) {
+            throw new RuntimeException("用户名已存在");
+        }
+
+        // 2. 创建新用户
+        User user = new User();
+        user.setUsername(username);
+        user.setPassword(password); // 注意：实际项目中需要加密
+
+        // 3. 保存到数据库
+        userMapper.insert(user);
+    }
 }
