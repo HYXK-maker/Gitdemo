@@ -1,151 +1,229 @@
 <template>
   <div class="doc-editor">
-    <div v-if="loading" class="loading">加载中...</div>
-    <div v-else>
-      <div class="editor-header">
-        <el-input v-model="title" placeholder="文档标题" @blur="saveTitle" />
-        <el-tag v-if="saving">保存中...</el-tag>
-      </div>
-      <div class="editor-container" v-if="editor">
-        <div class="toolbar">
-          <button @click="editor.chain().focus().toggleBold().run()" :class="{ 'is-active': editor.isActive('bold') }"><strong>B</strong></button>
-          <button @click="editor.chain().focus().toggleItalic().run()" :class="{ 'is-active': editor.isActive('italic') }"><em>I</em></button>
-          <button @click="editor.chain().focus().toggleUnderline().run()" :class="{ 'is-active': editor.isActive('underline') }"><u>U</u></button>
-          <button @click="editor.chain().focus().toggleHeading({ level: 1 }).run()" :class="{ 'is-active': editor.isActive('heading', { level: 1 }) }">H1</button>
-          <button @click="editor.chain().focus().toggleHeading({ level: 2 }).run()" :class="{ 'is-active': editor.isActive('heading', { level: 2 }) }">H2</button>
-          <button @click="editor.chain().focus().toggleBulletList().run()" :class="{ 'is-active': editor.isActive('bulletList') }">列表</button>
-          <button @click="editor.chain().focus().toggleOrderedList().run()" :class="{ 'is-active': editor.isActive('orderedList') }">编号</button>
-          <button @click="editor.chain().focus().toggleBlockquote().run()" :class="{ 'is-active': editor.isActive('blockquote') }">引用</button>
-          <button @click="editor.chain().focus().toggleCodeBlock().run()" :class="{ 'is-active': editor.isActive('codeBlock') }">代码块</button>
-          <button @click="editor.chain().focus().setHorizontalRule().run()">分割线</button>
+    <div v-if="loading" class="loading">
+      <el-icon class="is-loading"><Loading /></el-icon>
+      <span>加载中...</span>
+    </div>
+
+    <div v-else class="editor-wrapper">
+      <div class="editor-toolbar">
+        <el-input
+          v-model="title"
+          placeholder="文档标题"
+          size="large"
+          @blur="saveTitle"
+          class="title-input"
+        />
+        <div class="toolbar-actions">
+          <el-tag v-if="saving" type="info" size="small">保存中...</el-tag>
+          <el-tag v-else-if="saved" type="success" size="small">已保存</el-tag>
+          <el-button size="small" @click="showVersions = true">历史版本</el-button>
         </div>
-        <editor-content :editor="editor" class="editor-content" />
+      </div>
+
+      <div class="editor-content">
+        <textarea
+          ref="textareaRef"
+          v-model="content"
+          class="markdown-editor"
+          placeholder="请输入内容..."
+          @input="onContentChange"
+        ></textarea>
       </div>
     </div>
+
+
+    <el-dialog v-model="showVersions" title="历史版本" width="700px">
+      <el-timeline>
+        <el-timeline-item
+          v-for="version in versions"
+          :key="version.version"
+          :timestamp="formatTime(version.createdAt)"
+          placement="top"
+        >
+          <el-card>
+            <div class="version-info">
+              <span class="version-num">v{{ version.version }}</span>
+              <span class="version-note">{{ version.note || '无说明' }}</span>
+              <el-button link type="primary" @click="rollbackToVersion(version.version)">
+                恢复此版本
+              </el-button>
+            </div>
+          </el-card>
+        </el-timeline-item>
+      </el-timeline>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
 import { ref, watch, onBeforeUnmount } from 'vue'
-import { useEditor, EditorContent } from '@tiptap/vue-3'
-import StarterKit from '@tiptap/starter-kit'
-import Underline from '@tiptap/extension-underline'
-import Placeholder from '@tiptap/extension-placeholder'
-import { getDocDetail, updateDoc } from '@/api/doc'
+import { getDocDetail, updateDoc, getDocumentVersions, rollbackVersion } from '@/api/doc'
 import { ElMessage } from 'element-plus'
+import { Loading } from '@element-plus/icons-vue'
 
 const props = defineProps({ docId: Number })
+
 const loading = ref(false)
 const title = ref('')
+const content = ref('')
 const saving = ref(false)
+const saved = ref(false)
+const showVersions = ref(false)
+const versions = ref([])
+
 let saveTimer = null
+let autoSaveTimer = null
 
-const editor = useEditor({
-  extensions: [
-    StarterKit,
-    Underline,
-    Placeholder.configure({ placeholder: '请输入文档内容...' })
-  ],
-  content: '',
-  onUpdate: () => {
-    clearTimeout(saveTimer)
-    saveTimer = setTimeout(() => {
-      if (props.docId && editor.value) {
-        autoSave()
-      }
-    }, 2000)
-  }
-})
-
-// 加载文档
-watch(() => props.docId, async (id) => {
-  if (!id || !editor.value) return
+async function loadDoc() {
+  if (!props.docId) return
   loading.value = true
   try {
-    const data = await getDocDetail(id)
+    const data = await getDocDetail(props.docId)
     title.value = data.title
-    editor.value.commands.setContent(data.content || '')
+    content.value = data.content || ''
+  } catch (error) {
+    ElMessage.error('加载文档失败')
   } finally {
     loading.value = false
   }
-}, { immediate: true })
+}
 
-async function autoSave() {
-  if (!props.docId || !editor.value) return
+async function saveDoc(versionNote = '') {
+  if (!props.docId) return
   saving.value = true
+  saved.value = false
   try {
-    const html = editor.value.getHTML()
-    await updateDoc(props.docId, { title: title.value, content: html })
-  } catch (err) {
-    ElMessage.error('自动保存失败')
+    await updateDoc(props.docId, { title: title.value, content: content.value, versionNote })
+    saved.value = true
+    setTimeout(() => { saved.value = false }, 2000)
+  } catch (error) {
+    ElMessage.error('保存失败')
   } finally {
     saving.value = false
   }
 }
 
+function autoSave() {
+  if (autoSaveTimer) clearTimeout(autoSaveTimer)
+  autoSaveTimer = setTimeout(() => {
+    if (content.value !== '') {
+      saveDoc('自动保存')
+    }
+  }, 30000)
+}
+
+function onContentChange() {
+  if (saveTimer) clearTimeout(saveTimer)
+  saveTimer = setTimeout(() => {
+    saveDoc()
+  }, 2000)
+  autoSave()
+}
+
 async function saveTitle() {
-  if (!props.docId || !editor.value) return
-  await updateDoc(props.docId, { title: title.value, content: editor.value.getHTML() })
+  if (!props.docId) return
+  await updateDoc(props.docId, { title: title.value, content: content.value })
   ElMessage.success('标题已保存')
 }
 
+async function loadVersions() {
+  if (!props.docId) return
+  const data = await getDocumentVersions(props.docId)
+  versions.value = data
+}
+
+async function rollbackToVersion(versionNum) {
+  await rollbackVersion(props.docId, versionNum)
+  ElMessage.success('已恢复版本')
+  showVersions.value = false
+  await loadDoc()
+}
+
+function formatTime(time) {
+  if (!time) return ''
+  return new Date(time).toLocaleString()
+}
+
+watch(() => props.docId, () => {
+  loadDoc()
+}, { immediate: true })
+
+watch(showVersions, (val) => {
+  if (val) loadVersions()
+})
+
 onBeforeUnmount(() => {
-  editor.value?.destroy()
+  if (saveTimer) clearTimeout(saveTimer)
+  if (autoSaveTimer) clearTimeout(autoSaveTimer)
 })
 </script>
 
 <style scoped>
 .doc-editor {
-  background: white;
-  padding: 8px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
 }
 .loading {
-  padding: 20px;
-  text-align: center;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  height: 100%;
+  color: #909399;
 }
-.editor-header {
+.editor-wrapper {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+.editor-toolbar {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 8px;
+  padding: 12px 16px;
+  background: #fafafa;
+  border-bottom: 1px solid #e4e7ed;
 }
-.editor-container {
-  border: 1px solid #dcdfe6;
-  border-radius: 4px;
+.title-input {
+  width: 300px;
 }
-.toolbar {
-  padding: 8px;
-  border-bottom: 1px solid #e5e7eb;
+.toolbar-actions {
   display: flex;
-  gap: 4px;
-  flex-wrap: wrap;
-}
-.toolbar button {
-  padding: 4px 8px;
-  border: 1px solid #d1d5db;
-  border-radius: 4px;
-  background: white;
-  cursor: pointer;
-  font-size: 14px;
-}
-.toolbar button:hover {
-  background: #f3f4f6;
-}
-.toolbar button.is-active {
-  background: #e5e7eb;
-  border-color: #9ca3af;
+  gap: 12px;
+  align-items: center;
 }
 .editor-content {
-  padding: 12px;
-  min-height: 400px;
-  max-height: 600px;
-  overflow-y: auto;
+  flex: 1;
+  padding: 16px;
 }
-.editor-content :deep(.ProseMirror) {
+.markdown-editor {
+  width: 100%;
+  height: 100%;
+  padding: 16px;
+  border: 1px solid #dcdfe6;
+  border-radius: 8px;
+  font-family: 'Monaco', 'Menlo', monospace;
+  font-size: 14px;
+  line-height: 1.6;
+  resize: none;
   outline: none;
-  min-height: 380px;
 }
-.editor-content :deep(p) {
-  margin: 0.5em 0;
+.markdown-editor:focus {
+  border-color: #409eff;
+}
+.version-info {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+.version-num {
+  font-weight: bold;
+  color: #409eff;
+}
+.version-note {
+  flex: 1;
+  color: #606266;
 }
 </style>
