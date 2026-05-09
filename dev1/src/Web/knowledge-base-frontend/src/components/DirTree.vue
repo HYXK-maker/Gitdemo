@@ -5,13 +5,13 @@
         <h3>📁 文档目录</h3>
       </div>
       <div class="button-area">
-        <el-button type="primary" size="small" plain @click="createRootDir">
+        <el-button type="primary" size="small" plain @click="openCreateDir(null)">
           + 新建目录
         </el-button>
-        <el-button type="success" size="small" plain @click="createRootDoc">
+        <el-button type="success" size="small" plain @click="openCreateDoc(null)">
           + 新建文档
         </el-button>
-        <el-button size="small" plain @click="loadData">
+        <el-button size="small" plain @click="refreshTree">
           🔄 刷新
         </el-button>
       </div>
@@ -20,7 +20,7 @@
     <div class="search-area">
       <el-input
         v-model="keyword"
-        placeholder="搜索文件或文件夹..."
+        placeholder="搜索..."
         clearable
         size="small"
         prefix-icon="Search"
@@ -28,7 +28,6 @@
     </div>
 
     <div class="tree-area">
-      <!-- 目录列表 -->
       <div v-for="item in filteredList" :key="item.id" class="tree-item">
         <div
           class="tree-item-content"
@@ -36,13 +35,19 @@
           @click="handleItemClick(item)"
           @contextmenu.prevent="showContextMenu($event, item)"
         >
+          <span
+            v-if="item.type === 'dir' && item.children && item.children.length"
+            class="expand-icon"
+            @click.stop="toggleExpand(item.id)"
+          >
+            {{ expandedIds.has(item.id) ? '▼' : '▶' }}
+          </span>
+          <span v-else class="expand-placeholder"></span>
+
           <span class="icon">{{ item.type === 'dir' ? '📁' : '📄' }}</span>
           <span class="name">{{ item.name }}</span>
-          <el-dropdown
-            trigger="click"
-            @command="(cmd) => handleCommand(cmd, item)"
-            class="item-menu"
-          >
+
+          <el-dropdown trigger="click" @command="(cmd) => handleCommand(cmd, item)" @click.stop>
             <el-button link size="small">⋯</el-button>
             <template #dropdown>
               <el-dropdown-menu>
@@ -56,21 +61,28 @@
         </div>
 
         <!-- 子内容 -->
-        <div v-if="item.children && item.children.length" class="tree-children">
-          <div v-for="child in item.children" :key="child.id" class="tree-child-item">
+        <div v-if="item.type === 'dir' && expandedIds.has(item.id) && item.children && item.children.length" class="tree-children">
+          <div v-for="child in item.children" :key="child.id" class="tree-child">
             <div
-              class="tree-item-content child"
+              class="tree-item-content child-item"
+              :style="{ paddingLeft: '32px' }"
               :class="{ active: currentId === child.id }"
               @click="handleItemClick(child)"
               @contextmenu.prevent="showContextMenu($event, child)"
             >
+              <span
+                v-if="child.type === 'dir' && child.children && child.children.length"
+                class="expand-icon"
+                @click.stop="toggleExpand(child.id)"
+              >
+                {{ expandedIds.has(child.id) ? '▼' : '▶' }}
+              </span>
+              <span v-else class="expand-placeholder"></span>
+
               <span class="icon">{{ child.type === 'dir' ? '📁' : '📄' }}</span>
               <span class="name">{{ child.name }}</span>
-              <el-dropdown
-                trigger="click"
-                @command="(cmd) => handleCommand(cmd, child)"
-                class="item-menu"
-              >
+
+              <el-dropdown trigger="click" @command="(cmd) => handleCommand(cmd, child)" @click.stop>
                 <el-button link size="small">⋯</el-button>
                 <template #dropdown>
                   <el-dropdown-menu>
@@ -81,6 +93,34 @@
                   </el-dropdown-menu>
                 </template>
               </el-dropdown>
+            </div>
+
+            <!-- 三级子内容 -->
+            <div v-if="child.type === 'dir' && expandedIds.has(child.id) && child.children && child.children.length" class="tree-children">
+              <div v-for="grandChild in child.children" :key="grandChild.id" class="tree-child">
+                <div
+                  class="tree-item-content child-item"
+                  :style="{ paddingLeft: '52px' }"
+                  :class="{ active: currentId === grandChild.id }"
+                  @click="handleItemClick(grandChild)"
+                  @contextmenu.prevent="showContextMenu($event, grandChild)"
+                >
+                  <span class="icon">{{ grandChild.type === 'dir' ? '📁' : '📄' }}</span>
+                  <span class="name">{{ grandChild.name }}</span>
+
+                  <el-dropdown trigger="click" @command="(cmd) => handleCommand(cmd, grandChild)" @click.stop>
+                    <el-button link size="small">⋯</el-button>
+                    <template #dropdown>
+                      <el-dropdown-menu>
+                        <el-dropdown-item command="createDir">新建子目录</el-dropdown-item>
+                        <el-dropdown-item command="createDoc">新建文档</el-dropdown-item>
+                        <el-dropdown-item command="rename" divided>重命名</el-dropdown-item>
+                        <el-dropdown-item command="delete">删除</el-dropdown-item>
+                      </el-dropdown-menu>
+                    </template>
+                  </el-dropdown>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -93,11 +133,7 @@
 
     <!-- 新建对话框 -->
     <el-dialog v-model="dialogVisible" :title="dialogTitle" width="400px">
-      <el-input
-        v-model="dialogName"
-        :placeholder="dialogPlaceholder"
-        @keyup.enter="confirmCreate"
-      />
+      <el-input v-model="dialogName" :placeholder="dialogPlaceholder" @keyup.enter="confirmCreate" />
       <template #footer>
         <el-button @click="dialogVisible = false">取消</el-button>
         <el-button type="primary" @click="confirmCreate">确定</el-button>
@@ -106,11 +142,7 @@
 
     <!-- 重命名对话框 -->
     <el-dialog v-model="renameVisible" title="重命名" width="400px">
-      <el-input
-        v-model="renameName"
-        placeholder="请输入新名称"
-        @keyup.enter="confirmRename"
-      />
+      <el-input v-model="renameName" placeholder="请输入新名称" @keyup.enter="confirmRename" />
       <template #footer>
         <el-button @click="renameVisible = false">取消</el-button>
         <el-button type="primary" @click="confirmRename">确定</el-button>
@@ -118,11 +150,7 @@
     </el-dialog>
 
     <!-- 右键菜单 -->
-    <div
-      v-if="menuVisible"
-      class="context-menu"
-      :style="{ left: menuX + 'px', top: menuY + 'px' }"
-    >
+    <div v-if="menuVisible" class="context-menu" :style="{ left: menuX + 'px', top: menuY + 'px' }">
       <div class="menu-item" @click="menuCreateDir">新建子目录</div>
       <div class="menu-item" @click="menuCreateDoc">新建文档</div>
       <div class="menu-divider"></div>
@@ -140,12 +168,11 @@ import { createDoc } from '@/api/doc'
 
 const emit = defineEmits(['select-doc'])
 
-// 数据
 const treeList = ref([])
 const keyword = ref('')
 const currentId = ref(null)
+const expandedIds = ref(new Set())
 
-// 对话框
 const dialogVisible = ref(false)
 const dialogTitle = ref('')
 const dialogName = ref('')
@@ -153,18 +180,15 @@ const dialogType = ref('')
 const dialogParent = ref(null)
 const dialogPlaceholder = ref('')
 
-// 重命名
 const renameVisible = ref(false)
 const renameName = ref('')
 const renameItem = ref(null)
 
-// 右键菜单
 const menuVisible = ref(false)
 const menuX = ref(0)
 const menuY = ref(0)
 const menuItem = ref(null)
 
-// 过滤
 const filteredList = computed(() => {
   if (!keyword.value) return treeList.value
   return filterTree(treeList.value, keyword.value.toLowerCase())
@@ -183,38 +207,52 @@ function filterTree(list, kw) {
   })
 }
 
-// 加载数据
+async function refreshTree() {
+  await loadData()
+}
+
 async function loadData() {
   try {
     const res = await getDirTree()
     treeList.value = res || []
+    treeList.value.forEach(item => {
+      if (item.type === 'dir') {
+        expandedIds.value.add(item.id)
+      }
+    })
   } catch (error) {
     console.error('加载失败:', error)
     ElMessage.error('加载失败')
   }
 }
 
-// 创建根目录
-function createRootDir() {
+function toggleExpand(id) {
+  if (expandedIds.value.has(id)) {
+    expandedIds.value.delete(id)
+  } else {
+    expandedIds.value.add(id)
+  }
+  expandedIds.value = new Set(expandedIds.value)
+}
+
+function openCreateDir(parent) {
   dialogType.value = 'dir'
-  dialogParent.value = null
+  dialogParent.value = parent
   dialogTitle.value = '新建目录'
   dialogName.value = ''
   dialogPlaceholder.value = '请输入目录名称'
   dialogVisible.value = true
 }
 
-// 创建根文档
-function createRootDoc() {
+function openCreateDoc(parent) {
   dialogType.value = 'doc'
-  dialogParent.value = null
+  dialogParent.value = parent
   dialogTitle.value = '新建文档'
   dialogName.value = ''
   dialogPlaceholder.value = '请输入文档标题'
   dialogVisible.value = true
 }
 
-// 确认创建
 async function confirmCreate() {
   if (!dialogName.value.trim()) {
     ElMessage.warning('请输入名称')
@@ -228,24 +266,25 @@ async function confirmCreate() {
         parentId: dialogParent.value ? dialogParent.value.id : 0
       })
       ElMessage.success('目录创建成功')
+      await loadData()
     } else {
       const res = await createDoc({
         title: dialogName.value,
         content: '# ' + dialogName.value + '\n\n开始编写...'
       })
       ElMessage.success('文档创建成功')
+      await loadData()
       if (res.id) {
         emit('select-doc', res.id)
       }
     }
     dialogVisible.value = false
-    await loadData()
   } catch (error) {
+    console.error('创建失败:', error)
     ElMessage.error('创建失败')
   }
 }
 
-// 点击项目
 function handleItemClick(item) {
   currentId.value = item.id
   if (item.type === 'doc') {
@@ -253,22 +292,11 @@ function handleItemClick(item) {
   }
 }
 
-// 命令处理
 function handleCommand(cmd, item) {
   if (cmd === 'createDir') {
-    dialogType.value = 'dir'
-    dialogParent.value = item
-    dialogTitle.value = '新建子目录'
-    dialogName.value = ''
-    dialogPlaceholder.value = '请输入目录名称'
-    dialogVisible.value = true
+    openCreateDir(item)
   } else if (cmd === 'createDoc') {
-    dialogType.value = 'doc'
-    dialogParent.value = item
-    dialogTitle.value = '新建文档'
-    dialogName.value = ''
-    dialogPlaceholder.value = '请输入文档标题'
-    dialogVisible.value = true
+    openCreateDoc(item)
   } else if (cmd === 'rename') {
     renameItem.value = item
     renameName.value = item.name
@@ -278,7 +306,6 @@ function handleCommand(cmd, item) {
   }
 }
 
-// 确认重命名
 async function confirmRename() {
   if (!renameName.value.trim()) {
     ElMessage.warning('请输入名称')
@@ -294,11 +321,10 @@ async function confirmRename() {
   }
 }
 
-// 删除
 async function deleteItem(item) {
   try {
     await ElMessageBox.confirm(
-      `确定删除 "${item.name}" 吗？${item.type === 'dir' ? '删除目录会删除所有子内容。' : ''}`,
+      `确定删除 "${item.name}" 吗？`,
       '警告',
       { type: 'warning' }
     )
@@ -306,6 +332,7 @@ async function deleteItem(item) {
     ElMessage.success('删除成功')
     if (currentId.value === item.id) {
       currentId.value = null
+      emit('select-doc', null)
     }
     await loadData()
   } catch (error) {
@@ -315,37 +342,26 @@ async function deleteItem(item) {
   }
 }
 
-// 右键菜单
 function showContextMenu(event, item) {
+  event.preventDefault()
   menuItem.value = item
   menuX.value = event.clientX
   menuY.value = event.clientY
   menuVisible.value = true
 }
 
-function menuCreateDir() {
-  handleCommand('createDir', menuItem.value)
-  menuVisible.value = false
-}
+function menuCreateDir() { handleCommand('createDir', menuItem.value); menuVisible.value = false }
+function menuCreateDoc() { handleCommand('createDoc', menuItem.value); menuVisible.value = false }
+function menuRename() { handleCommand('rename', menuItem.value); menuVisible.value = false }
+function menuDelete() { handleCommand('delete', menuItem.value); menuVisible.value = false }
 
-function menuCreateDoc() {
-  handleCommand('createDoc', menuItem.value)
-  menuVisible.value = false
-}
+function closeMenu() { menuVisible.value = false }
 
-function menuRename() {
-  handleCommand('rename', menuItem.value)
-  menuVisible.value = false
-}
-
-function menuDelete() {
-  handleCommand('delete', menuItem.value)
-  menuVisible.value = false
-}
-
-function closeMenu() {
-  menuVisible.value = false
-}
+// 暴露方法给父组件
+defineExpose({
+  refreshTree,
+  loadData
+})
 
 onMounted(() => {
   loadData()
@@ -373,7 +389,6 @@ onUnmounted(() => {
 .title-area h3 {
   margin: 0 0 12px 0;
   font-size: 16px;
-  color: #1f2f3d;
 }
 
 .button-area {
@@ -394,18 +409,18 @@ onUnmounted(() => {
 }
 
 .tree-item {
-  margin-bottom: 4px;
+  margin-bottom: 2px;
 }
 
 .tree-item-content {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   padding: 8px 12px;
   border-radius: 6px;
   cursor: pointer;
   transition: all 0.2s;
-  position: relative;
+  min-height: 36px;
 }
 
 .tree-item-content:hover {
@@ -417,34 +432,42 @@ onUnmounted(() => {
   color: #409eff;
 }
 
+.child-item {
+  padding: 6px 12px;
+}
+
+.expand-icon {
+  width: 16px;
+  font-size: 10px;
+  color: #909399;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.expand-placeholder {
+  width: 16px;
+  flex-shrink: 0;
+}
+
 .tree-item-content .icon {
   font-size: 16px;
+  flex-shrink: 0;
 }
 
 .tree-item-content .name {
   flex: 1;
   font-size: 14px;
-}
-
-.tree-item-content .item-menu {
-  opacity: 0;
-  transition: opacity 0.2s;
-}
-
-.tree-item-content:hover .item-menu {
-  opacity: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .tree-children {
-  margin-left: 28px;
+  margin-left: 0;
 }
 
-.tree-child-item {
-  margin-bottom: 2px;
-}
-
-.tree-item-content.child {
-  padding-left: 0;
+.tree-child {
+  margin-top: 2px;
 }
 
 .empty-state {
@@ -467,7 +490,6 @@ onUnmounted(() => {
   padding: 8px 16px;
   cursor: pointer;
   font-size: 13px;
-  transition: background 0.2s;
 }
 
 .menu-item:hover {

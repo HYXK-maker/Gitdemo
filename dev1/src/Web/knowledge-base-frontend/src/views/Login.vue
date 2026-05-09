@@ -10,10 +10,17 @@
           <el-input v-model="form.password" type="password" placeholder="密码" prefix-icon="Lock" />
         </el-form-item>
         <el-form-item>
-          <el-button type="primary" :loading="loading" @click="handleLogin" style="width:100%">登录</el-button>
+          <el-button type="primary" :loading="loading" @click="handleLogin" style="width:100%">
+            登录
+          </el-button>
         </el-form-item>
       </el-form>
-      <div class="tip">没有账号？<router-link to="/register">立即注册</router-link></div>
+      <div class="tip">
+        没有账号？<router-link to="/register">立即注册</router-link>
+      </div>
+      <div class="demo-tip">
+        演示账号：admin / 123456
+      </div>
     </el-card>
   </div>
 </template>
@@ -30,8 +37,8 @@ const formRef = ref(null)
 const loading = ref(false)
 
 const form = reactive({
-  username: '',
-  password: ''
+  username: 'admin',
+  password: '123456'
 })
 
 const rules = {
@@ -40,15 +47,27 @@ const rules = {
 }
 
 async function handleLogin() {
-  const valid = await formRef.value.validate().catch(() => false)
-  if (!valid) return
-  loading.value = true
+  console.log('handleLogin 被调用')
+
+  // 表单验证
   try {
+    await formRef.value.validate()
+  } catch (error) {
+    console.log('表单验证失败:', error)
+    return
+  }
+
+  loading.value = true
+
+  try {
+    console.log('调用 loginAction, 用户名:', form.username)
     await userStore.loginAction(form)
+    console.log('loginAction 完成, 准备跳转')
     ElMessage.success('登录成功')
     router.push('/main')
   } catch (err) {
-    // 错误已在拦截器中处理
+    console.error('登录失败:', err)
+    // 错误已经在 store 中处理了，这里不需要重复提示
   } finally {
     loading.value = false
   }
@@ -68,5 +87,16 @@ async function handleLogin() {
 }
 .tip {
   text-align: right;
+  margin-top: 10px;
+}
+.tip a {
+  color: #409eff;
+  text-decoration: none;
+}
+.demo-tip {
+  text-align: center;
+  margin-top: 20px;
+  font-size: 12px;
+  color: #909399;
 }
 </style>

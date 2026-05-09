@@ -22,9 +22,7 @@
           <el-tag v-else-if="saved" type="success" size="small">
             已保存
           </el-tag>
-          <el-button size="small" @click="showHistory = true">
-            历史版本
-          </el-button>
+          <el-button size="small" @click="openHistoryDialog">历史版本</el-button>
         </div>
       </div>
 
@@ -39,17 +37,42 @@
     </div>
 
     <!-- 历史版本弹窗 -->
-    <el-dialog v-model="showHistory" title="历史版本" width="600px">
-      <div v-for="version in versions" :key="version.version" class="version-item">
-        <div class="version-header">
-          <span class="version-num">版本 v{{ version.version }}</span>
-          <span class="version-time">{{ formatTime(version.createdAt) }}</span>
-          <el-button link type="primary" size="small" @click="rollbackToVersion(version.version)">
-            恢复
-          </el-button>
-        </div>
-        <div class="version-note">{{ version.note || '无说明' }}</div>
-      </div>
+    <el-dialog v-model="showHistory" title="历史版本" width="700px" @close="closeHistory">
+      <el-timeline>
+        <el-timeline-item
+          v-for="(version, index) in versions"
+          :key="version.version"
+          :timestamp="formatTime(version.createdAt)"
+          placement="top"
+          :type="index === 0 ? 'primary' : 'info'"
+        >
+          <el-card shadow="hover">
+            <div class="version-item">
+              <div class="version-header">
+                <span class="version-num">
+                  <el-tag :type="index === 0 ? 'danger' : ''" size="small">
+                    v{{ version.version }}
+                  </el-tag>
+                  <span v-if="index === 0" class="current-badge">当前版本</span>
+                </span>
+                <span class="version-note">{{ version.note || '无说明' }}</span>
+                <el-button
+                  v-if="index !== 0"
+                  type="primary"
+                  link
+                  size="small"
+                  @click="rollbackToVersion(version.version)"
+                >
+                  恢复此版本
+                </el-button>
+              </div>
+              <div class="version-preview">
+                {{ getPreview(version.content) }}
+              </div>
+            </div>
+          </el-card>
+        </el-timeline-item>
+      </el-timeline>
       <div v-if="versions.length === 0" class="empty-versions">暂无历史版本</div>
     </el-dialog>
   </div>
@@ -69,6 +92,7 @@ const saving = ref(false)
 const saved = ref(false)
 const showHistory = ref(false)
 const versions = ref([])
+const currentVersion = ref(1)
 
 let saveTimer = null
 let autoSaveTimer = null
@@ -80,6 +104,7 @@ async function loadDoc() {
     const data = await getDocDetail(props.docId)
     title.value = data.title || ''
     content.value = data.content || ''
+    currentVersion.value = data.version || 1
   } catch (error) {
     console.error('加载失败:', error)
     ElMessage.error('加载文档失败')
@@ -88,14 +113,20 @@ async function loadDoc() {
   }
 }
 
-async function saveDoc() {
+async function saveDoc(versionNote = '') {
   if (!props.docId) return
   saving.value = true
   saved.value = false
   try {
-    await updateDoc(props.docId, { title: title.value, content: content.value })
+    await updateDoc(props.docId, {
+      title: title.value,
+      content: content.value,
+      versionNote: versionNote
+    })
     saved.value = true
     setTimeout(() => { saved.value = false }, 2000)
+    // 保存后重新加载以更新版本号
+    await loadDoc()
   } catch (error) {
     ElMessage.error('保存失败')
   } finally {
@@ -107,7 +138,7 @@ function autoSave() {
   if (autoSaveTimer) clearTimeout(autoSaveTimer)
   autoSaveTimer = setTimeout(() => {
     if (content.value !== '') {
-      saveDoc()
+      saveDoc('自动保存')
     }
   }, 30000)
 }
@@ -130,6 +161,11 @@ async function saveTitle() {
   }
 }
 
+async function openHistoryDialog() {
+  showHistory.value = true
+  await loadVersions()
+}
+
 async function loadVersions() {
   if (!props.docId) return
   try {
@@ -137,14 +173,23 @@ async function loadVersions() {
     versions.value = data || []
   } catch (error) {
     console.error('加载版本失败:', error)
+    ElMessage.error('加载版本历史失败')
   }
 }
 
 async function rollbackToVersion(versionNum) {
   try {
-    await ElMessageBox.confirm(`确定恢复到 v${versionNum} 吗？`, '确认恢复', { type: 'info' })
+    await ElMessageBox.confirm(
+      `确定恢复到 v${versionNum} 吗？当前未保存的内容将会丢失。`,
+      '确认恢复',
+      {
+        type: 'warning',
+        confirmButtonText: '确定恢复',
+        cancelButtonText: '取消'
+      }
+    )
     await rollbackVersion(props.docId, versionNum)
-    ElMessage.success('已恢复版本')
+    ElMessage.success('已恢复到版本 v' + versionNum)
     showHistory.value = false
     await loadDoc()
   } catch (error) {
@@ -154,19 +199,33 @@ async function rollbackToVersion(versionNum) {
   }
 }
 
+function closeHistory() {
+  showHistory.value = false
+}
+
+function getPreview(content) {
+  if (!content) return '空内容'
+  // 移除 Markdown 标记，只显示纯文本预览
+  const plainText = content
+    .replace(/#{1,6}\s/g, '')
+    .replace(/\*\*/g, '')
+    .replace(/\*/g, '')
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+    .replace(/`{1,3}[^`]*`{1,3}/g, '')
+    .replace(/\n/g, ' ')
+    .substring(0, 100)
+  return plainText + (plainText.length >= 100 ? '...' : '')
+}
+
 function formatTime(time) {
   if (!time) return ''
   const date = new Date(time)
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}:${String(date.getSeconds()).padStart(2, '0')}`
 }
 
 watch(() => props.docId, () => {
   loadDoc()
 }, { immediate: true })
-
-watch(showHistory, (val) => {
-  if (val) loadVersions()
-})
 
 onBeforeUnmount(() => {
   if (saveTimer) clearTimeout(saveTimer)
@@ -270,31 +329,42 @@ onBeforeUnmount(() => {
 }
 
 .version-item {
-  padding: 12px 0;
-  border-bottom: 1px solid #f0f0f0;
+  padding: 4px 0;
 }
 
 .version-header {
   display: flex;
   align-items: center;
   gap: 16px;
-  margin-bottom: 8px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
 }
 
 .version-num {
-  font-weight: bold;
-  color: #409eff;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
-.version-time {
+.current-badge {
   font-size: 12px;
-  color: #909399;
+  color: #f56c6c;
+  margin-left: 8px;
 }
 
 .version-note {
+  flex: 1;
   font-size: 13px;
   color: #606266;
-  padding-left: 20px;
+}
+
+.version-preview {
+  font-size: 12px;
+  color: #909399;
+  background: #f5f7fa;
+  padding: 8px 12px;
+  border-radius: 6px;
+  line-height: 1.5;
 }
 
 .empty-versions {

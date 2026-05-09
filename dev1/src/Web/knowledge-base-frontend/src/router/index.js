@@ -15,16 +15,17 @@ const router = createRouter({
   routes
 })
 
-// 路由守卫：未登录跳转到登录页
-router.beforeEach((to, from, next) => {
+// 修复路由守卫 - 不使用 next 回调，直接返回
+router.beforeEach((to, from) => {
   const token = localStorage.getItem('token')
+
   if (to.meta.requiresAuth && !token) {
-    next('/login')
-  } else if (!to.meta.requiresAuth && token) {
-    next('/main')
-  } else {
-    next()
+    return '/login'
   }
+  if ((to.path === '/login' || to.path === '/register') && token) {
+    return '/main'
+  }
+  return true
 })
 
 export default router
