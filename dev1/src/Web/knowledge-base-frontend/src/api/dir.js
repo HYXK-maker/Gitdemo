@@ -1,96 +1,118 @@
 import request from './request'
 
 
-let directories = [
-  { id: 1, name: '我的文档', type: 'dir', parentId: 0, level: 0 },
-  { id: 2, name: '工作文档', type: 'dir', parentId: 0, level: 0 },
-  { id: 3, name: '项目资料', type: 'dir', parentId: 2, level: 1 },
-  { id: 4, name: '个人笔记', type: 'dir', parentId: 1, level: 1 }
-]
-
-let documents = [
-  { id: 101, name: 'README.md', type: 'doc', parentId: 1, docId: 1 },
-  { id: 102, name: '开发规范.md', type: 'doc', parentId: 2, docId: 2 },
-  { id: 103, name: 'API文档.md', type: 'doc', parentId: 3, docId: 3 },
-  { id: 104, name: '学习笔记.md', type: 'doc', parentId: 4, docId: 4 }
-]
-
-let nextId = 5
-let nextDocId = 5
-
-
-function buildTree(parentId = 0) {
-  // 获取子目录
-  const dirs = directories
-    .filter(d => d.parentId === parentId)
-    .map(d => ({
-      ...d,
-      children: buildTree(d.id)
-    }))
-
-
-  const docs = documents
-    .filter(d => d.parentId === parentId)
-    .map(d => ({
-      ...d,
-      children: []
-    }))
-
-  return [...dirs, ...docs]
+let docContents = {
+  1: { id: 1, title: 'README', content: '# 欢迎使用文档系统\n\n这是一个示例文档，您可以在这里编写内容。', version: 1, updatedAt: new Date().toISOString() },
+  2: { id: 2, title: '开发规范', content: '# 开发规范\n\n## 代码规范\n- 使用 ESLint\n- 遵循 Vue 3 风格指南', version: 1, updatedAt: new Date().toISOString() },
+  3: { id: 3, title: 'API文档', content: '# API 文档\n\n## 接口列表\n- 用户登录\n- 文档管理', version: 1, updatedAt: new Date().toISOString() },
+  4: { id: 4, title: '学习笔记', content: '# 学习笔记\n\n记录日常学习内容。', version: 1, updatedAt: new Date().toISOString() }
 }
 
-export async function getDirTree() {
-  await new Promise(resolve => setTimeout(resolve, 300))
-  const tree = buildTree(0)
-  return tree
+let docVersions = {
+  1: [{ version: 1, content: '# 欢迎使用文档系统\n\n这是一个示例文档，您可以在这里编写内容。', createdAt: new Date().toISOString(), note: '初始版本' }],
+  2: [{ version: 1, content: '# 开发规范\n\n## 代码规范\n- 使用 ESLint\n- 遵循 Vue 3 风格指南', createdAt: new Date().toISOString(), note: '初始版本' }],
+  3: [{ version: 1, content: '# API 文档\n\n## 接口列表\n- 用户登录\n- 文档管理', createdAt: new Date().toISOString(), note: '初始版本' }],
+  4: [{ version: 1, content: '# 学习笔记\n\n记录日常学习内容。', createdAt: new Date().toISOString(), note: '初始版本' }]
 }
 
-export async function createDir(data) {
+export async function createDoc(data) {
   await new Promise(resolve => setTimeout(resolve, 300))
 
-  const newDir = {
-    id: nextId++,
-    name: data.name,
-    type: 'dir',
-    parentId: data.parentId || 0,
-    level: 0
+  const newId = Math.max(...Object.keys(docContents).map(Number), 0) + 1
+  const newDoc = {
+    id: newId,
+    title: data.title,
+    content: data.content || '',
+    version: 1,
+    updatedAt: new Date().toISOString()
   }
-  directories.push(newDir)
-  return { id: newDir.id }
+  docContents[newId] = newDoc
+  docVersions[newId] = [{
+    version: 1,
+    content: newDoc.content,
+    createdAt: new Date().toISOString(),
+    note: '初始版本'
+  }]
+
+  return { id: newId }
 }
 
-export async function renameDir(id, name) {
+export async function getDocDetail(id) {
   await new Promise(resolve => setTimeout(resolve, 200))
 
-  const dir = directories.find(d => d.id === id)
-  if (dir) {
-    dir.name = name
+  const doc = docContents[id]
+  if (!doc) {
+    throw new Error('文档不存在')
   }
-  const doc = documents.find(d => d.id === id)
-  if (doc) {
-    doc.name = name
+  return doc
+}
+
+export async function updateDoc(id, data) {
+  await new Promise(resolve => setTimeout(resolve, 500))
+
+  const doc = docContents[id]
+  if (!doc) {
+    throw new Error('文档不存在')
   }
+
+  const oldContent = doc.content
+  doc.title = data.title || doc.title
+  doc.content = data.content || doc.content
+  doc.version = (doc.version || 0) + 1
+  doc.updatedAt = new Date().toISOString()
+
+
+  if (data.content && oldContent !== data.content) {
+    if (!docVersions[id]) docVersions[id] = []
+    docVersions[id].unshift({
+      version: doc.version,
+      content: data.content,
+      createdAt: new Date().toISOString(),
+      note: data.versionNote || '更新文档'
+    })
+
+    if (docVersions[id].length > 10) docVersions[id].pop()
+  }
+
+  return { success: true, version: doc.version }
+}
+
+export async function deleteDoc(id) {
+  await new Promise(resolve => setTimeout(resolve, 300))
+
+  delete docContents[id]
+  delete docVersions[id]
   return { success: true }
 }
 
-export async function deleteDir(id) {
-  await new Promise(resolve => setTimeout(resolve, 300))
+export async function getDocumentVersions(docId) {
+  await new Promise(resolve => setTimeout(resolve, 200))
 
+  return docVersions[docId] || []
+}
 
-  const idsToDelete = [id]
-  const findChildren = (parentId) => {
-    directories.filter(d => d.parentId === parentId).forEach(child => {
-      idsToDelete.push(child.id)
-      findChildren(child.id)
-    })
-    documents.filter(d => d.parentId === parentId).forEach(doc => {
-      idsToDelete.push(doc.id)
+export async function rollbackVersion(docId, versionNum) {
+  await new Promise(resolve => setTimeout(resolve, 500))
+
+  const versions = docVersions[docId]
+  const targetVersion = versions.find(v => v.version === versionNum)
+  if (!targetVersion) {
+    throw new Error('版本不存在')
+  }
+
+  const doc = docContents[docId]
+  if (doc) {
+    doc.content = targetVersion.content
+    doc.version = (doc.version || 0) + 1
+    doc.updatedAt = new Date().toISOString()
+
+    versions.unshift({
+      version: doc.version,
+      content: targetVersion.content,
+      createdAt: new Date().toISOString(),
+      note: `回滚到 v${versionNum}`
     })
   }
-  findChildren(id)
-
-  directories = directories.filter(d => !idsToDelete.includes(d.id))
-  documents = documents.filter(d => !idsToDelete.includes(d.id))
 
   return { success: true }
 }
