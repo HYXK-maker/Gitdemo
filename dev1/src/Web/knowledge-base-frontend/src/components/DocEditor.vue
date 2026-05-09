@@ -1,57 +1,56 @@
 <template>
   <div class="doc-editor">
-    <div v-if="loading" class="loading">
-      <el-icon class="is-loading"><Loading /></el-icon>
+    <div v-if="loading" class="loading-container">
+      <div class="loading-spinner"></div>
       <span>加载中...</span>
     </div>
 
-    <div v-else class="editor-wrapper">
-      <div class="editor-toolbar">
-        <el-input
-          v-model="title"
-          placeholder="文档标题"
-          size="large"
-          @blur="saveTitle"
-          class="title-input"
-        />
-        <div class="toolbar-actions">
-          <el-tag v-if="saving" type="info" size="small">保存中...</el-tag>
-          <el-tag v-else-if="saved" type="success" size="small">已保存</el-tag>
-          <el-button size="small" @click="showVersions = true">历史版本</el-button>
+    <div v-else class="editor-container">
+      <div class="editor-header">
+        <div class="title-area">
+          <el-input
+            v-model="title"
+            placeholder="文档标题"
+            class="title-input"
+            @blur="saveTitle"
+          />
+        </div>
+        <div class="actions-area">
+          <el-tag v-if="saving" type="info" size="small">
+            保存中...
+          </el-tag>
+          <el-tag v-else-if="saved" type="success" size="small">
+            已保存
+          </el-tag>
+          <el-button size="small" @click="showHistory = true">
+            历史版本
+          </el-button>
         </div>
       </div>
 
-      <div class="editor-content">
+      <div class="editor-body">
         <textarea
-          ref="textareaRef"
           v-model="content"
-          class="markdown-editor"
+          class="content-textarea"
           placeholder="请输入内容..."
           @input="onContentChange"
         ></textarea>
       </div>
     </div>
 
-
-    <el-dialog v-model="showVersions" title="历史版本" width="700px">
-      <el-timeline>
-        <el-timeline-item
-          v-for="version in versions"
-          :key="version.version"
-          :timestamp="formatTime(version.createdAt)"
-          placement="top"
-        >
-          <el-card>
-            <div class="version-info">
-              <span class="version-num">v{{ version.version }}</span>
-              <span class="version-note">{{ version.note || '无说明' }}</span>
-              <el-button link type="primary" @click="rollbackToVersion(version.version)">
-                恢复此版本
-              </el-button>
-            </div>
-          </el-card>
-        </el-timeline-item>
-      </el-timeline>
+    <!-- 历史版本弹窗 -->
+    <el-dialog v-model="showHistory" title="历史版本" width="600px">
+      <div v-for="version in versions" :key="version.version" class="version-item">
+        <div class="version-header">
+          <span class="version-num">版本 v{{ version.version }}</span>
+          <span class="version-time">{{ formatTime(version.createdAt) }}</span>
+          <el-button link type="primary" size="small" @click="rollbackToVersion(version.version)">
+            恢复
+          </el-button>
+        </div>
+        <div class="version-note">{{ version.note || '无说明' }}</div>
+      </div>
+      <div v-if="versions.length === 0" class="empty-versions">暂无历史版本</div>
     </el-dialog>
   </div>
 </template>
@@ -59,8 +58,7 @@
 <script setup>
 import { ref, watch, onBeforeUnmount } from 'vue'
 import { getDocDetail, updateDoc, getDocumentVersions, rollbackVersion } from '@/api/doc'
-import { ElMessage } from 'element-plus'
-import { Loading } from '@element-plus/icons-vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 
 const props = defineProps({ docId: Number })
 
@@ -69,7 +67,7 @@ const title = ref('')
 const content = ref('')
 const saving = ref(false)
 const saved = ref(false)
-const showVersions = ref(false)
+const showHistory = ref(false)
 const versions = ref([])
 
 let saveTimer = null
@@ -80,21 +78,22 @@ async function loadDoc() {
   loading.value = true
   try {
     const data = await getDocDetail(props.docId)
-    title.value = data.title
+    title.value = data.title || ''
     content.value = data.content || ''
   } catch (error) {
+    console.error('加载失败:', error)
     ElMessage.error('加载文档失败')
   } finally {
     loading.value = false
   }
 }
 
-async function saveDoc(versionNote = '') {
+async function saveDoc() {
   if (!props.docId) return
   saving.value = true
   saved.value = false
   try {
-    await updateDoc(props.docId, { title: title.value, content: content.value, versionNote })
+    await updateDoc(props.docId, { title: title.value, content: content.value })
     saved.value = true
     setTimeout(() => { saved.value = false }, 2000)
   } catch (error) {
@@ -108,7 +107,7 @@ function autoSave() {
   if (autoSaveTimer) clearTimeout(autoSaveTimer)
   autoSaveTimer = setTimeout(() => {
     if (content.value !== '') {
-      saveDoc('自动保存')
+      saveDoc()
     }
   }, 30000)
 }
@@ -123,33 +122,49 @@ function onContentChange() {
 
 async function saveTitle() {
   if (!props.docId) return
-  await updateDoc(props.docId, { title: title.value, content: content.value })
-  ElMessage.success('标题已保存')
+  try {
+    await updateDoc(props.docId, { title: title.value, content: content.value })
+    ElMessage.success('标题已保存')
+  } catch (error) {
+    ElMessage.error('保存失败')
+  }
 }
 
 async function loadVersions() {
   if (!props.docId) return
-  const data = await getDocumentVersions(props.docId)
-  versions.value = data
+  try {
+    const data = await getDocumentVersions(props.docId)
+    versions.value = data || []
+  } catch (error) {
+    console.error('加载版本失败:', error)
+  }
 }
 
 async function rollbackToVersion(versionNum) {
-  await rollbackVersion(props.docId, versionNum)
-  ElMessage.success('已恢复版本')
-  showVersions.value = false
-  await loadDoc()
+  try {
+    await ElMessageBox.confirm(`确定恢复到 v${versionNum} 吗？`, '确认恢复', { type: 'info' })
+    await rollbackVersion(props.docId, versionNum)
+    ElMessage.success('已恢复版本')
+    showHistory.value = false
+    await loadDoc()
+  } catch (error) {
+    if (error !== 'cancel') {
+      ElMessage.error('恢复失败')
+    }
+  }
 }
 
 function formatTime(time) {
   if (!time) return ''
-  return new Date(time).toLocaleString()
+  const date = new Date(time)
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
 }
 
 watch(() => props.docId, () => {
   loadDoc()
 }, { immediate: true })
 
-watch(showVersions, (val) => {
+watch(showHistory, (val) => {
   if (val) loadVersions()
 })
 
@@ -162,68 +177,129 @@ onBeforeUnmount(() => {
 <style scoped>
 .doc-editor {
   height: 100%;
+  background: #fff;
+  border-radius: 12px;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
 }
-.loading {
+
+.loading-container {
   display: flex;
   justify-content: center;
   align-items: center;
-  gap: 8px;
+  gap: 12px;
   height: 100%;
   color: #909399;
 }
-.editor-wrapper {
+
+.loading-spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid #e4e7ed;
+  border-top-color: #409eff;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.editor-container {
   height: 100%;
   display: flex;
   flex-direction: column;
 }
-.editor-toolbar {
+
+.editor-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid #e4e7ed;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 12px 16px;
   background: #fafafa;
-  border-bottom: 1px solid #e4e7ed;
 }
+
 .title-input {
-  width: 300px;
+  font-size: 20px;
+  font-weight: 600;
 }
-.toolbar-actions {
+
+.title-input :deep(.el-input__wrapper) {
+  box-shadow: none;
+  padding: 0;
+  background: transparent;
+}
+
+.title-input :deep(.el-input__inner) {
+  font-size: 20px;
+  font-weight: 600;
+  height: 40px;
+}
+
+.actions-area {
   display: flex;
   gap: 12px;
   align-items: center;
 }
-.editor-content {
+
+.editor-body {
   flex: 1;
-  padding: 16px;
+  padding: 20px;
 }
-.markdown-editor {
+
+.content-textarea {
   width: 100%;
   height: 100%;
   padding: 16px;
-  border: 1px solid #dcdfe6;
+  border: 1px solid #e4e7ed;
   border-radius: 8px;
-  font-family: 'Monaco', 'Menlo', monospace;
+  font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
   font-size: 14px;
   line-height: 1.6;
   resize: none;
   outline: none;
+  background: #fafafa;
 }
-.markdown-editor:focus {
+
+.content-textarea:focus {
   border-color: #409eff;
+  background: #fff;
 }
-.version-info {
+
+.version-item {
+  padding: 12px 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.version-header {
   display: flex;
   align-items: center;
-  gap: 20px;
+  gap: 16px;
+  margin-bottom: 8px;
 }
+
 .version-num {
   font-weight: bold;
   color: #409eff;
 }
+
+.version-time {
+  font-size: 12px;
+  color: #909399;
+}
+
 .version-note {
-  flex: 1;
+  font-size: 13px;
   color: #606266;
+  padding-left: 20px;
+}
+
+.empty-versions {
+  text-align: center;
+  padding: 40px;
+  color: #909399;
 }
 </style>
