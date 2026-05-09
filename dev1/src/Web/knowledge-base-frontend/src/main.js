@@ -7,13 +7,14 @@ import router from './router'
 import pinia from './stores'
 
 const app = createApp(App)
-app.use(ElementPlus)
-app.use(router)
-app.use(pinia)
 
-// 全局注册所有 Element Plus 图标
+
 for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
   app.component(key, component)
 }
+
+app.use(ElementPlus)
+app.use(router)
+app.use(pinia)
 
 app.mount('#app')
