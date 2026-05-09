@@ -4,7 +4,7 @@
       <span class="logo">协同文档知识库</span>
       <div class="user-area">
         <span>{{ userStore.currentUser?.nickname || userStore.currentUser?.username }}</span>
-        <el-button type="text" @click="logout">退出</el-button>
+        <el-button link @click="logout">退出</el-button>
       </div>
     </el-header>
     <el-container class="body-container">
