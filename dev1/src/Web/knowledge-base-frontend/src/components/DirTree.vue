@@ -1,150 +1,170 @@
 <template>
-  <div class="dir-tree-container">
-    <div class="toolbar">
-      <el-button type="primary" size="small" plain @click="openCreateDirDialog(null)">
-        + 新建根目录
+  <div class="dir-tree">
+    <div class="tree-header">
+      <el-button type="primary" size="small" @click="openCreateDialog(null, 'dir')">
+        + 新建目录
       </el-button>
-      <el-button type="success" size="small" plain @click="openCreateDocDialog(null)">
+      <el-button type="success" size="small" @click="openCreateDialog(null, 'doc')">
         + 新建文档
       </el-button>
     </div>
 
-    <!-- 目录树列表 -->
-    <div class="tree-list">
+    <div class="tree-content">
       <div v-for="item in treeData" :key="item.id" class="tree-node">
-        <div class="node-label" @click="onNodeClick(item)">
-          <span>{{ item.type === 'dir' ? '📁' : '📄' }}</span>
-          <span>{{ item.name }}</span>
+        <div
+          class="node-item"
+          :class="{ active: selectedId === item.id }"
+          @click="handleNodeClick(item)"
+        >
+          <span class="node-icon">{{ item.type === 'dir' ? '📁' : '📄' }}</span>
+          <span class="node-name">{{ item.name }}</span>
+          <el-dropdown trigger="click" @command="(cmd) => handleCommand(cmd, item)">
+            <span class="node-more">⋯</span>
+            <template #dropdown>
+              <el-dropdown-menu>
+                <el-dropdown-item command="rename">重命名</el-dropdown-item>
+                <el-dropdown-item v-if="item.type === 'dir'" command="createDir">新建目录</el-dropdown-item>
+                <el-dropdown-item v-if="item.type === 'dir'" command="createDoc">新建文档</el-dropdown-item>
+                <el-dropdown-item command="delete" divided>删除</el-dropdown-item>
+              </el-dropdown-menu>
+            </template>
+          </el-dropdown>
+        </div>
+        <div v-if="item.children && item.children.length" class="node-children">
+          <DirTreeNode
+            v-for="child in item.children"
+            :key="child.id"
+            :node="child"
+            :selected-id="selectedId"
+            @select="handleNodeClick"
+            @command="handleCommand"
+          />
         </div>
       </div>
-      <div v-if="treeData.length === 0" class="empty-text">
-        暂无数据，请先创建目录
+      <div v-if="treeData.length === 0" class="empty-tip">
+        暂无内容，点击上方按钮创建
       </div>
     </div>
 
-    <!-- 新建目录弹窗 -->
-    <el-dialog v-model="dirDialog.visible" title="新建目录" width="350px">
-      <el-input v-model="dirDialog.name" placeholder="请输入目录名称" />
+
+    <el-dialog v-model="dialog.visible" :title="dialog.title" width="350px">
+      <el-input v-model="dialog.name" :placeholder="dialog.placeholder" />
       <template #footer>
-        <el-button @click="dirDialog.visible = false">取消</el-button>
-        <el-button type="primary" @click="submitCreateDir">确定</el-button>
+        <el-button @click="dialog.visible = false">取消</el-button>
+        <el-button type="primary" @click="submitCreate">确定</el-button>
       </template>
     </el-dialog>
 
-    <!-- 新建文档弹窗 -->
-    <el-dialog v-model="docDialog.visible" title="新建文档" width="350px">
-      <el-input v-model="docDialog.title" placeholder="请输入文档标题" />
+
+    <el-dialog v-model="renameDialog.visible" title="重命名" width="350px">
+      <el-input v-model="renameDialog.name" placeholder="新名称" />
       <template #footer>
-        <el-button @click="docDialog.visible = false">取消</el-button>
-        <el-button type="primary" @click="submitCreateDoc">确定</el-button>
+        <el-button @click="renameDialog.visible = false">取消</el-button>
+        <el-button type="primary" @click="submitRename">确定</el-button>
       </template>
     </el-dialog>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, reactive } from 'vue'
-import { getDirTree, createDir } from '@/api/dir'
+import { ref, onMounted } from 'vue'
+import { getDirTree, createDir, renameDir, deleteDir } from '@/api/dir'
 import { createDoc } from '@/api/doc'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 
 const emit = defineEmits(['select-doc'])
 const treeData = ref([])
+const selectedId = ref(null)
 
-// 弹窗状态
-const dirDialog = reactive({
-  visible: false,
-  name: '',
-  parent: null
-})
+const dialog = ref({ visible: false, title: '', name: '', type: '', parent: null, placeholder: '' })
+const renameDialog = ref({ visible: false, name: '', node: null })
 
-const docDialog = reactive({
-  visible: false,
-  title: '',
-  parent: null
-})
-
-// 加载目录树
 async function loadTree() {
   try {
-    console.log('开始加载目录树...')
-    const res = await getDirTree()
-    console.log('目录树数据:', res)
-    treeData.value = res || []
+    treeData.value = await getDirTree()
   } catch (error) {
-    console.error('加载目录失败:', error)
-    ElMessage.error('加载目录失败，请检查后端服务')
+    ElMessage.error('加载目录失败')
   }
 }
 
-// 打开新建目录弹窗
-function openCreateDirDialog(parent) {
-  console.log('打开新建目录弹窗, parent:', parent)
-  dirDialog.parent = parent
-  dirDialog.name = ''
-  dirDialog.visible = true
+function openCreateDialog(parent, type) {
+  dialog.value = {
+    visible: true,
+    title: type === 'dir' ? '新建目录' : '新建文档',
+    name: '',
+    type: type,
+    parent: parent,
+    placeholder: type === 'dir' ? '请输入目录名称' : '请输入文档标题'
+  }
 }
 
-// 打开新建文档弹窗
-function openCreateDocDialog(parent) {
-  console.log('打开新建文档弹窗, parent:', parent)
-  docDialog.parent = parent
-  docDialog.title = ''
-  docDialog.visible = true
-}
-
-// 提交创建目录
-async function submitCreateDir() {
-  if (!dirDialog.name.trim()) {
-    ElMessage.warning('请输入目录名称')
+async function submitCreate() {
+  if (!dialog.value.name.trim()) {
+    ElMessage.warning('请输入名称')
     return
   }
-  const parentId = dirDialog.parent ? dirDialog.parent.id : 0
-  console.log('创建目录参数:', { name: dirDialog.name, parentId })
 
   try {
-    await createDir({ name: dirDialog.name, parentId })
-    ElMessage.success('目录创建成功')
-    dirDialog.visible = false
+    if (dialog.value.type === 'dir') {
+      await createDir({
+        name: dialog.value.name,
+        parentId: dialog.value.parent ? dialog.value.parent.id : 0
+      })
+      ElMessage.success('目录创建成功')
+    } else {
+      const res = await createDoc({
+        title: dialog.value.name,
+        content: '# 新文档\n\n开始编写内容...'
+      })
+      ElMessage.success('文档创建成功')
+      if (res.id) {
+        emit('select-doc', res.id)
+      }
+    }
+    dialog.value.visible = false
     await loadTree()
   } catch (error) {
-    console.error('创建目录失败:', error)
-    ElMessage.error('创建失败，请检查后端')
+    ElMessage.error('创建失败')
   }
 }
 
-// 提交创建文档
-async function submitCreateDoc() {
-  if (!docDialog.title.trim()) {
-    ElMessage.warning('请输入文档标题')
-    return
-  }
-  const folderId = docDialog.parent ? docDialog.parent.id : 0
-  console.log('创建文档参数:', { title: docDialog.title, folderId })
-
-  try {
-    await createDoc({
-      title: docDialog.title,
-      folderId: folderId,
-      doc_type: 1,
-      content: ''
-    })
-    ElMessage.success('文档创建成功')
-    docDialog.visible = false
-    await loadTree()
-  } catch (error) {
-    console.error('创建文档失败:', error)
-    ElMessage.error('创建失败，请检查后端')
+function handleNodeClick(node) {
+  selectedId.value = node.id
+  if (node.type === 'doc') {
+    emit('select-doc', node.docId || node.id)
   }
 }
 
-// 点击节点
-function onNodeClick(item) {
-  if (item.type === 'doc') {
-    emit('select-doc', item.id)
-  } else if (item.type === 'dir') {
-    // 可以扩展目录展开功能
-    console.log('点击目录:', item.name)
+function handleCommand(cmd, node) {
+  if (cmd === 'rename') {
+    renameDialog.value = { visible: true, name: node.name, node: node }
+  } else if (cmd === 'createDir') {
+    openCreateDialog(node, 'dir')
+  } else if (cmd === 'createDoc') {
+    openCreateDialog(node, 'doc')
+  } else if (cmd === 'delete') {
+    ElMessageBox.confirm(`确定删除 "${node.name}" 吗？`, '警告', { type: 'warning' })
+      .then(async () => {
+        await deleteDir(node.id)
+        ElMessage.success('删除成功')
+        await loadTree()
+        if (selectedId.value === node.id) {
+          emit('select-doc', null)
+        }
+      })
+      .catch(() => {})
+  }
+}
+
+async function submitRename() {
+  if (!renameDialog.value.name.trim()) return
+  try {
+    await renameDir(renameDialog.value.node.id, renameDialog.value.name)
+    ElMessage.success('重命名成功')
+    renameDialog.value.visible = false
+    await loadTree()
+  } catch (error) {
+    ElMessage.error('重命名失败')
   }
 }
 
@@ -154,45 +174,68 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.dir-tree-container {
-  padding: 12px;
+.dir-tree {
   height: 100%;
-  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
 }
-
-.toolbar {
+.tree-header {
+  padding: 12px;
+  border-bottom: 1px solid #e4e7ed;
   display: flex;
   gap: 8px;
-  margin-bottom: 16px;
   flex-wrap: wrap;
 }
-
-.tree-list {
-  margin-top: 8px;
+.tree-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px;
 }
-
 .tree-node {
-  padding: 6px 8px;
-  cursor: pointer;
-  border-radius: 4px;
-  transition: background 0.2s;
+  margin-left: 0;
 }
-
-.tree-node:hover {
-  background: #ecf5ff;
-}
-
-.node-label {
+.node-item {
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 14px;
+  gap: 6px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
 }
-
-.empty-text {
+.node-item:hover {
+  background: #ecf5ff;
+}
+.node-item.active {
+  background: #409eff20;
+  color: #409eff;
+}
+.node-icon {
+  font-size: 16px;
+}
+.node-name {
+  flex: 1;
+  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.node-more {
+  opacity: 0;
+  font-size: 18px;
+  cursor: pointer;
+  padding: 0 4px;
+}
+.node-item:hover .node-more {
+  opacity: 1;
+}
+.node-children {
+  margin-left: 20px;
+}
+.empty-tip {
   text-align: center;
   color: #909399;
-  padding: 40px 20px;
+  padding: 40px;
   font-size: 13px;
 }
 </style>
