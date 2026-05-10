@@ -1,15 +1,15 @@
 <template>
-  <div class="tree-node-wrapper">
+  <div class="tree-node">
+
     <div
-      class="tree-item-content"
-      :style="{ paddingLeft: (level * 20 + 12) + 'px' }"
-      :class="{ active: currentId === node.id }"
+      class="tree-node-content"
+      :class="{ active: selectedId === node.id }"
       @click="handleClick"
       @contextmenu.prevent="handleContextMenu"
     >
-      <!-- 展开/折叠按钮 -->
+
       <span
-        v-if="hasChildren"
+        v-if="node.type === 'dir' && node.children && node.children.length"
         class="expand-icon"
         @click.stop="toggleExpand"
       >
@@ -17,112 +17,113 @@
       </span>
       <span v-else class="expand-placeholder"></span>
 
-      <span class="icon">{{ node.type === 'dir' ? '📁' : '📄' }}</span>
-      <span class="name">{{ node.name }}</span>
+      <span class="node-icon">{{ node.type === 'dir' ? '📁' : '📄' }}</span>
+      <span class="node-name">{{ node.name }}</span>
 
-      <el-dropdown
-        trigger="click"
-        @command="(cmd) => handleCommand(cmd)"
-        class="item-menu"
-        @click.stop
-      >
+
+      <el-dropdown trigger="click" @command="(cmd) => handleCommand(cmd)" @click.stop>
         <el-button link size="small">⋯</el-button>
         <template #dropdown>
           <el-dropdown-menu>
-            <el-dropdown-item command="createDir">新建子目录</el-dropdown-item>
-            <el-dropdown-item command="createDoc">新建文档</el-dropdown-item>
-            <el-dropdown-item command="rename" divided>重命名</el-dropdown-item>
-            <el-dropdown-item command="delete">删除</el-dropdown-item>
+            <template v-if="node.type === 'dir'">
+              <el-dropdown-item command="createDir">新建子目录</el-dropdown-item>
+              <el-dropdown-item command="createDoc">新建文档</el-dropdown-item>
+              <el-dropdown-item command="rename" divided>重命名</el-dropdown-item>
+              <el-dropdown-item command="delete">删除</el-dropdown-item>
+            </template>
+            <template v-else>
+              <el-dropdown-item command="rename">重命名</el-dropdown-item>
+              <el-dropdown-item command="delete">删除</el-dropdown-item>
+            </template>
           </el-dropdown-menu>
         </template>
       </el-dropdown>
     </div>
 
-    <!-- 子节点（递归） -->
-    <div v-if="hasChildren && expanded" class="tree-children">
+    <div v-if="node.type === 'dir' && expanded && node.children && node.children.length" class="tree-children">
       <TreeNode
         v-for="child in node.children"
         :key="child.id"
         :node="child"
-        :level="level + 1"
-        :current-id="currentId"
-        @select="(val) => $emit('select', val)"
-        @contextmenu="(event, val) => $emit('contextmenu', event, val)"
-        @command="(cmd, val) => $emit('command', cmd, val)"
+        :selected-id="selectedId"
+        :expanded-map="expandedMap"
+        @toggle="handleToggle"
+        @select="handleSelect"
+        @command="handleChildCommand"
+        @contextmenu="handleContextMenu"
       />
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { computed } from 'vue'
 
 const props = defineProps({
-  node: {
-    type: Object,
-    required: true
-  },
-  level: {
-    type: Number,
-    default: 0
-  },
-  currentId: {
-    type: [Number, String],
-    default: null
-  }
+  node: Object,
+  selectedId: [Number, String],
+  expandedMap: Object
 })
 
-const emit = defineEmits(['select', 'contextmenu', 'command'])
+const emit = defineEmits(['toggle', 'select', 'command', 'contextmenu'])
 
-const expanded = ref(true)
 
-const hasChildren = computed(() => {
-  return props.node.type === 'dir' && props.node.children && props.node.children.length > 0
-})
+const expanded = computed(() => props.expandedMap[props.node.id] || false)
+
 
 function toggleExpand() {
-  expanded.value = !expanded.value
+  emit('toggle', props.node.id)
 }
+
 
 function handleClick() {
   emit('select', props.node)
 }
 
+
 function handleContextMenu(event) {
   emit('contextmenu', event, props.node)
 }
 
+
 function handleCommand(cmd) {
   emit('command', cmd, props.node)
+}
+
+function handleToggle(id) {
+  emit('toggle', id)
+}
+
+// 子节点触发的 select（向上传递）
+function handleSelect(node) {
+  emit('select', node)
+}
+
+function handleChildCommand(cmd, node) {
+  emit('command', cmd, node)
 }
 </script>
 
 <style scoped>
-.tree-node-wrapper {
+.tree-node {
   margin-bottom: 2px;
 }
-
-.tree-item-content {
+.tree-node-content {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   padding: 8px 12px;
   border-radius: 6px;
   cursor: pointer;
-  transition: all 0.2s;
-  position: relative;
-  min-height: 36px;
+  transition: background 0.2s;
 }
-
-.tree-item-content:hover {
+.tree-node-content:hover {
   background: #f5f7fa;
 }
-
-.tree-item-content.active {
+.tree-node-content.active {
   background: #ecf5ff;
   color: #409eff;
 }
-
 .expand-icon {
   width: 16px;
   font-size: 10px;
@@ -130,36 +131,22 @@ function handleCommand(cmd) {
   cursor: pointer;
   flex-shrink: 0;
 }
-
 .expand-placeholder {
   width: 16px;
   flex-shrink: 0;
 }
-
-.tree-item-content .icon {
+.node-icon {
   font-size: 16px;
   flex-shrink: 0;
 }
-
-.tree-item-content .name {
+.node-name {
   flex: 1;
   font-size: 14px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-
-.tree-item-content .item-menu {
-  opacity: 0;
-  transition: opacity 0.2s;
-  flex-shrink: 0;
-}
-
-.tree-item-content:hover .item-menu {
-  opacity: 1;
-}
-
 .tree-children {
-  /* 子节点样式 */
+  margin-left: 24px;
 }
 </style>
