@@ -65,6 +65,7 @@ import { useUserStore } from '@/stores/user'
 import DirTree from '@/components/DirTree.vue'
 import DocEditor from '@/components/DocEditor.vue'
 import { UserFilled, ArrowDown } from '@element-plus/icons-vue'
+import { getDocDetail } from '@/api/doc'  // 【新增】引入获取文档详情的API
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -78,20 +79,41 @@ const userName = computed(() => {
 
 const currentPath = ref('知识库')
 
-function handleSelectDoc(docId) {
+async function handleSelectDoc(docId) {
   console.log('选中文档:', docId)
-  currentDocId.value = docId
+  if (!docId) {
+    currentDocId.value = null
+    return
+  }
+  // 【修改】先去尝试获取文档详情，确认文档存在
+  try {
+    await getDocDetail(docId)
+    currentDocId.value = docId
+    currentPath.value = `知识库 > 文档 ${docId}`
+  } catch (error) {
+    console.error('获取文档详情失败:', error)
+    // 如果获取失败，可能是文档已被删除，刷新树
+    if (dirTreeRef.value) {
+      dirTreeRef.value.loadTree()
+    }
+  }
 }
 
-function handleDocCreated(docId) {
+async function handleDocCreated(docId) {
   console.log('文档创建成功:', docId)
-  currentDocId.value = docId
+  // 【修改】创建成功后，刷新目录树并自动打开新文档
+  if (dirTreeRef.value) {
+    await dirTreeRef.value.loadTree()
+  }
+  if (docId) {
+    await handleSelectDoc(docId)
+  }
 }
 
 function handleDocUpdated() {
-  // 文档更新后可以刷新目录树
+  // 文档更新后可以刷新目录树（比如重命名等情况）
   if (dirTreeRef.value) {
-    dirTreeRef.value.refreshTree()
+    dirTreeRef.value.loadTree()  // 【修复】方法名改为 loadTree
   }
 }
 
