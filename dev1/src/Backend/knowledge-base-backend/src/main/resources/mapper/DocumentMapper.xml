@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.doc.system.mapper.DocumentMapper">
+
+    <resultMap id="BaseResultMap" type="com.doc.system.entity.Document">
+        <id column="id" property="id"/>
+        <result column="title" property="title"/>
+        <result column="content" property="content"/>
+        <result column="directory_id" property="directoryId"/>
+        <result column="create_time" property="createTime"/>
+        <result column="update_time" property="updateTime"/>
+    </resultMap>
+
+    <select id="findByDirectoryId" resultMap="BaseResultMap">
+        SELECT * FROM document WHERE directory_id = #{directoryId} ORDER BY update_time DESC
+    </select>
+
+    <select id="findById" resultMap="BaseResultMap">
+        SELECT * FROM document WHERE id = #{id}
+    </select>
+
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO document (title, content, directory_id) VALUES (#{title}, #{content}, #{directoryId})
+    </insert>
+
+    <update id="updateContent">
+        UPDATE document SET content = #{content} WHERE id = #{id}
+    </update>
+
+    <update id="updateTitle">
+        UPDATE document SET title = #{title} WHERE id = #{id}
+    </update>
+
+    <delete id="deleteById">
+        DELETE FROM document WHERE id = #{id}
+    </delete>
+</mapper>

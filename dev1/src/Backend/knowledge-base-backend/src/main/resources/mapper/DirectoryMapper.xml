@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.doc.system.mapper.DirectoryMapper">
+
+    <resultMap id="BaseResultMap" type="com.doc.system.entity.Directory">
+        <id column="id" property="id"/>
+        <result column="name" property="name"/>
+        <result column="parent_id" property="parentId"/>
+        <result column="type" property="type"/>
+        <result column="create_time" property="createTime"/>
+        <result column="update_time" property="updateTime"/>
+    </resultMap>
+
+    <select id="findAll" resultMap="BaseResultMap">
+        SELECT * FROM directory ORDER BY type, name
+    </select>
+
+    <select id="findById" resultMap="BaseResultMap">
+        SELECT * FROM directory WHERE id = #{id}
+    </select>
+
+    <select id="findByParentId" resultMap="BaseResultMap">
+        SELECT * FROM directory WHERE parent_id = #{parentId} ORDER BY type, name
+    </select>
+
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO directory (name, parent_id, type) VALUES (#{name}, #{parentId}, #{type})
+    </insert>
+
+    <update id="updateName">
+        UPDATE directory SET name = #{name} WHERE id = #{id}
+    </update>
+
+    <delete id="deleteById">
+        DELETE FROM directory WHERE id = #{id}
+    </delete>
+</mapper>
