@@ -1,3 +1,8 @@
+<!--
+  文件：src/components/DocEditor.vue
+  功能：富文本编辑，支持加粗、斜体、列表等，保存 HTML 内容
+-->
+
 <template>
   <div class="doc-editor">
     <div v-if="loading" class="loading">
@@ -24,13 +29,16 @@
           </el-button>
         </div>
       </div>
+
+      <!-- ====== 替换为 Quill 富文本编辑器 ====== -->
       <div class="editor-body">
-        <textarea
-          v-model="content"
-          class="editor-textarea"
-          placeholder="开始编写文档内容..."
-          :readonly="saving"
-        ></textarea>
+        <QuillEditor
+          v-model:content="content"
+          content-type="html"
+          theme="snow"
+          :toolbar="toolbarOptions"
+          style="height: calc(100vh - 200px)"
+        />
       </div>
     </template>
     <div v-else class="error">
@@ -41,8 +49,12 @@
 
 <script setup>
 import { ref, watch, nextTick } from 'vue'
-import { getDocDetail, updateDoc, createDocVersion } from '@/api/doc'
 import { ElMessage } from 'element-plus'
+import { QuillEditor } from '@vueup/vue-quill'
+import 'quill/dist/quill.snow.css'
+
+/* ====== 【替换API】根据你项目中的实际路径调整 ====== */
+import { getDocDetail, updateDoc, createDocVersion } from '@/api/doc'
 
 const props = defineProps({
   docId: {
@@ -61,10 +73,21 @@ const titleInputRef = ref(null)
 const loading = ref(false)
 const saving = ref(false)
 
+// Quill 工具栏选项
+const toolbarOptions = [
+  ['bold', 'italic', 'underline', 'strike'],
+  [{ 'header': 1 }, { 'header': 2 }],
+  [{ 'list': 'ordered' }, { 'list': 'bullet' }],
+  [{ 'color': [] }, { 'background': [] }],
+  ['blockquote', 'code-block'],
+  ['clean']
+]
+
 async function loadDoc() {
   if (!props.docId) return
   loading.value = true
   try {
+    /* 【替换API】获取文档详情 */
     const res = await getDocDetail(props.docId)
     doc.value = res.data || res
     content.value = doc.value.content || ''
@@ -79,23 +102,22 @@ async function loadDoc() {
 
 async function handleSave() {
   if (!doc.value) return
-  if (!content.value.trim()) {
+  if (!content.value.replace(/<[^>]*>?/gm, '').trim()) {
     ElMessage.warning('内容不能为空')
     return
   }
   saving.value = true
   try {
-    // 更新文档标题和内容
+    /* 【替换API】更新文档内容（content 为 HTML 字符串） */
     await updateDoc(props.docId, {
       title: titleDraft.value || doc.value.title,
       content: content.value
     })
-    // 尝试创建版本（如果后端支持）
+    // 尝试创建版本（若后端未实现版本功能，失败时静默忽略）
     try {
+      /* 【替换API】创建文档版本（可选） */
       await createDocVersion(props.docId, content.value, `用户保存于 ${new Date().toLocaleString()}`)
-    } catch (versionErr) {
-      // 版本功能暂未启用，忽略错误
-    }
+    } catch (versionErr) { /* 静默 */ }
     ElMessage.success('保存成功')
     emit('doc-updated')
   } catch (err) {
@@ -116,8 +138,8 @@ function startEditTitle() {
 async function saveTitle() {
   editingTitle.value = false
   doc.value.title = titleDraft.value
-  // 标题更改时自动保存一次（可考虑加入防抖）
   try {
+    /* 【替换API】更新标题 */
     await updateDoc(props.docId, {
       title: titleDraft.value,
       content: content.value
@@ -130,11 +152,8 @@ async function saveTitle() {
 }
 
 watch(() => props.docId, (newId) => {
-  if (newId) {
-    loadDoc()
-  } else {
-    doc.value = null
-  }
+  if (newId) loadDoc()
+  else doc.value = null
 }, { immediate: true })
 </script>
 
@@ -148,11 +167,9 @@ watch(() => props.docId, (newId) => {
   overflow: hidden;
   box-shadow: 0 2px 12px rgba(0,0,0,0.04);
 }
-
 .loading {
   padding: 32px;
 }
-
 .toolbar {
   display: flex;
   align-items: center;
@@ -161,7 +178,6 @@ watch(() => props.docId, (newId) => {
   border-bottom: 1px solid #ebeef5;
   gap: 16px;
 }
-
 .doc-title {
   font-size: 20px;
   font-weight: 600;
@@ -174,41 +190,18 @@ watch(() => props.docId, (newId) => {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-
 .title-input {
   max-width: 400px;
 }
-
 .actions {
   display: flex;
   gap: 8px;
   flex-shrink: 0;
 }
-
 .editor-body {
   flex: 1;
-  padding: 24px;
   overflow: auto;
 }
-
-.editor-textarea {
-  width: 100%;
-  height: 100%;
-  min-height: 400px;
-  border: none;
-  outline: none;
-  resize: none;
-  font-size: 15px;
-  line-height: 1.8;
-  color: #2c3e50;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-  background: transparent;
-}
-
-.editor-textarea::placeholder {
-  color: #b3b3b3;
-}
-
 .error {
   padding: 40px;
 }
