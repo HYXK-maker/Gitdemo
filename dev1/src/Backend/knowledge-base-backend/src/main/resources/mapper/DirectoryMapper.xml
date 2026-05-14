@@ -7,12 +7,17 @@
         <result column="name" property="name"/>
         <result column="parent_id" property="parentId"/>
         <result column="type" property="type"/>
+        <result column="user_id" property="userId"/>
         <result column="create_time" property="createTime"/>
         <result column="update_time" property="updateTime"/>
     </resultMap>
 
     <select id="findAll" resultMap="BaseResultMap">
         SELECT * FROM directory ORDER BY type, name
+    </select>
+
+    <select id="findByUserId" resultMap="BaseResultMap">
+        SELECT * FROM directory WHERE user_id = #{userId} ORDER BY type, name
     </select>
 
     <select id="findById" resultMap="BaseResultMap">
@@ -24,7 +29,7 @@
     </select>
 
     <insert id="insert" useGeneratedKeys="true" keyProperty="id">
-        INSERT INTO directory (name, parent_id, type) VALUES (#{name}, #{parentId}, #{type})
+        INSERT INTO directory (name, parent_id, type, user_id) VALUES (#{name}, #{parentId}, #{type}, #{userId})
     </insert>
 
     <update id="updateName">

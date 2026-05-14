@@ -5,25 +5,37 @@ import { ElMessage } from 'element-plus'
 
 export const useUserStore = defineStore('user', () => {
   const token = ref(localStorage.getItem('token') || '')
-  const currentUser = ref(null)
+  const userId = ref(localStorage.getItem('userId') || '')
+  const username = ref(localStorage.getItem('username') || '')
+  const currentUser = ref(JSON.parse(localStorage.getItem('currentUser') || 'null'))
 
   async function loginAction(form) {
     try {
-      console.log('loginAction 开始:', form)
       const data = await apiLogin(form)
-      console.log('loginAction 返回数据:', data)
 
       if (data && data.token) {
         token.value = data.token
         localStorage.setItem('token', data.token)
-        currentUser.value = data.user
-        console.log('登录成功, token已保存')
+
+        if (data.userId) {
+          userId.value = data.userId
+          localStorage.setItem('userId', data.userId.toString())
+        }
+
+        // 存储用户名
+        const name = data.username || form.username
+        username.value = name
+        localStorage.setItem('username', name)
+
+        // 存储完整用户对象
+        currentUser.value = { username: name }
+        localStorage.setItem('currentUser', JSON.stringify(currentUser.value))
+
         return true
       } else {
         throw new Error('登录失败：无token返回')
       }
     } catch (error) {
-      console.error('loginAction 错误:', error)
       ElMessage.error(error.message || '登录失败')
       throw error
     }
@@ -31,9 +43,14 @@ export const useUserStore = defineStore('user', () => {
 
   function logout() {
     token.value = ''
-    localStorage.removeItem('token')
+    userId.value = ''
+    username.value = ''
     currentUser.value = null
+    localStorage.removeItem('token')
+    localStorage.removeItem('userId')
+    localStorage.removeItem('username')
+    localStorage.removeItem('currentUser')
   }
 
-  return { token, currentUser, loginAction, logout }
+  return { token, userId, username, currentUser, loginAction, logout }
 })

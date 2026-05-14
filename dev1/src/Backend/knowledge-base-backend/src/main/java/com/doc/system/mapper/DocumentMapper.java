@@ -7,6 +7,7 @@ import java.util.List;
 @Mapper
 public interface DocumentMapper {
     List<Document> findAll();
+    List<Document> findByUserId(Long userId);
     List<Document> findByDirectoryId(Long directoryId);
     Document findById(Long id);
     int insert(Document doc);

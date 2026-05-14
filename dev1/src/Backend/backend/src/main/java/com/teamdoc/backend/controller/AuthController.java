@@ -31,14 +31,27 @@ public class AuthController {
         return ResponseEntity.ok(response);
     }
 
+    @SuppressWarnings("unchecked")
     @PostMapping("/api/auth/login")
     public ResponseEntity<Map<String, Object>> login(@RequestBody Map<String, String> user) {
         String url = dbServiceUrl + "/api/user/login";
-        String token = restTemplate.postForObject(url, user, String.class);
+        // 8080 登录接口返回 JSON 对象，包含 data 字段
+        Map<String, Object> result = restTemplate.postForObject(url, user, Map.class);
+        String token = null;
+        Long userId = null;
+        if (result != null && result.get("data") != null) {
+            token = result.get("data").toString();
+            // token格式: "login-success-token-2"
+            if (token.startsWith("login-success-token-")) {
+                String idPart = token.substring("login-success-token-".length());
+                userId = Long.valueOf(idPart);
+            }
+        }
         Map<String, Object> response = new HashMap<>();
         response.put("code", 200);
         response.put("msg", "登录成功");
-        response.put("token", token);   // 前端从 token 字段取值
+        response.put("token", token);
+        response.put("userId", userId);
         return ResponseEntity.ok(response);
     }
 }

@@ -7,6 +7,7 @@ public class Document {
     private String title;
     private String content;
     private Long directoryId;
+    private Long userId;
     private LocalDateTime createTime;
     private LocalDateTime updateTime;
 
@@ -18,6 +19,8 @@ public class Document {
     public void setContent(String content) { this.content = content; }
     public Long getDirectoryId() { return directoryId; }
     public void setDirectoryId(Long directoryId) { this.directoryId = directoryId; }
+    public Long getUserId() { return userId; }
+    public void setUserId(Long userId) { this.userId = userId; }
     public LocalDateTime getCreateTime() { return createTime; }
     public void setCreateTime(LocalDateTime createTime) { this.createTime = createTime; }
     public LocalDateTime getUpdateTime() { return updateTime; }

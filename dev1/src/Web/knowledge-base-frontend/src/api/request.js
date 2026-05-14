@@ -10,10 +10,14 @@ const request = axios.create({
 request.interceptors.request.use(
   config => {
     const token = localStorage.getItem('token')
+    const userId = localStorage.getItem('userId')
+
     if (token) {
       config.headers['Authorization'] = `Bearer ${token}`
     }
-    console.log('请求:', config.method, config.url, config.data)
+    if (userId) {
+      config.headers['X-User-Id'] = userId
+    }
     return config
   },
   error => {
@@ -25,7 +29,6 @@ request.interceptors.request.use(
 // 响应拦截器
 request.interceptors.response.use(
   response => {
-    console.log('响应:', response.status, response.data)
     // 直接返回 data
     return response.data
   },
@@ -36,6 +39,7 @@ request.interceptors.response.use(
       if (status === 401) {
         ElMessage.error('登录已过期，请重新登录')
         localStorage.removeItem('token')
+        localStorage.removeItem('userId')
         window.location.href = '/login'
       } else {
         ElMessage.error(data?.message || '请求失败')

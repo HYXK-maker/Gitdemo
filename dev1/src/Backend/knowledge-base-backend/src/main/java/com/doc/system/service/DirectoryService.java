@@ -15,8 +15,9 @@ public class DirectoryService {
     @Autowired
     private DirectoryMapper directoryMapper;
 
-    public List<Directory> getTree() {
-        List<Directory> all = directoryMapper.findAll();
+    /** 获取指定用户的目录树 */
+    public List<Directory> getTreeByUser(Long userId) {
+        List<Directory> all = directoryMapper.findByUserId(userId);
         return buildTree(all, 0L);
     }
 
@@ -27,11 +28,13 @@ public class DirectoryService {
                 .collect(Collectors.toList());
     }
 
-    public Directory createDir(String name, Long parentId) {
+    /** 创建目录，并指定所属用户 */
+    public Directory createDir(String name, Long parentId, Long userId) {
         Directory dir = new Directory();
         dir.setName(name);
         dir.setParentId(parentId == null ? 0L : parentId);
         dir.setType("dir");
+        dir.setUserId(userId);
         directoryMapper.insert(dir);
         return dir;
     }

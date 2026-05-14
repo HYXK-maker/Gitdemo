@@ -21,11 +21,13 @@ public class DocumentService {
         return documentMapper.findByDirectoryId(directoryId == null ? 0L : directoryId);
     }
 
-    public Document create(String title, String content, Long directoryId) {
+    /** 创建文档，并指定所属用户 */
+    public Document create(String title, String content, Long directoryId, Long userId) {
         Document doc = new Document();
         doc.setTitle(title);
         doc.setContent(content == null ? "" : content);
         doc.setDirectoryId(directoryId == null ? 0L : directoryId);
+        doc.setUserId(userId);
         documentMapper.insert(doc);
         return doc;
     }
