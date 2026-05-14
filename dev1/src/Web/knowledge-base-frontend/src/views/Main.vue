@@ -1,23 +1,36 @@
+<!--
+  文件：src/views/Main.vue (或你的布局文件)
+  功能：主布局，包含侧边栏（目录树+回收站入口）和主内容区（编辑器/回收站）
+-->
+
 <template>
   <div class="main-layout" :class="{ dark: themeStore.isDark }">
-    <!-- 侧边栏 - 折叠后更窄 -->
+    <!-- 侧边栏 -->
     <div class="sidebar" :class="{ collapsed: isCollapsed }">
       <div class="sidebar-header">
         <div class="logo" @click="toggleSidebar">
           <span class="logo-icon">📚</span>
           <span v-show="!isCollapsed" class="logo-text">知识库</span>
         </div>
-        <el-button
-          circle
-          size="small"
-          class="toggle-btn"
-          @click="toggleSidebar"
-        >
+        <el-button circle size="small" class="toggle-btn" @click="toggleSidebar">
           {{ isCollapsed ? '▶' : '◀' }}
         </el-button>
       </div>
       <div v-show="!isCollapsed" class="sidebar-content">
+        <!-- 目录树 -->
         <DirTree ref="dirTreeRef" @select-doc="handleSelectDoc" @doc-created="handleDocCreated" />
+        
+        <!-- 回收站入口（新增） -->
+        <div class="sidebar-menu">
+          <div
+            class="menu-item recycle-entry"
+            :class="{ active: currentView === 'recycle' }"
+            @click="showRecycleBin"
+          >
+            <el-icon><Delete /></el-icon>
+            <span>回收站</span>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -28,7 +41,6 @@
           <span class="current-path">{{ currentPath }}</span>
         </div>
         <div class="header-right">
-          <!-- 主题切换按钮 -->
           <el-button @click="themeStore.toggle" circle>
             {{ themeStore.isDark ? '☀️' : '🌙' }}
           </el-button>
@@ -48,22 +60,29 @@
       </div>
 
       <div class="content-area">
-        <div v-if="currentDocId" class="doc-workspace">
-          <DocEditor
-            :key="currentDocId"
-            :docId="currentDocId"
-            @doc-updated="handleDocUpdated"
-            class="editor-pane"
-          />
-          <VersionPanel
-            ref="versionPanelRef"
-            :docId="currentDocId"
-            @restore="handleRestoreVersion"
-            class="version-pane"
-          />
+        <!-- 回收站视图 -->
+        <div v-if="currentView === 'recycle'" class="page-view">
+          <RecycleBin ref="recycleBinRef" />
         </div>
-        <div v-else class="empty-state">
-          <el-empty description="请在左侧选择或创建文档" :image-size="120" />
+        <!-- 文档编辑视图 -->
+        <div v-else class="doc-workspace">
+          <div v-if="currentDocId" class="doc-workspace">
+            <DocEditor
+              :key="currentDocId"
+              :docId="currentDocId"
+              @doc-updated="handleDocUpdated"
+              class="editor-pane"
+            />
+            <VersionPanel
+              ref="versionPanelRef"
+              :docId="currentDocId"
+              @restore="handleRestoreVersion"
+              class="version-pane"
+            />
+          </div>
+          <div v-else class="empty-state">
+            <el-empty description="请在左侧选择或创建文档" :image-size="120" />
+          </div>
         </div>
       </div>
     </div>
@@ -78,7 +97,10 @@ import { useThemeStore } from '@/stores/theme'
 import DirTree from '@/components/DirTree.vue'
 import DocEditor from '@/components/DocEditor.vue'
 import VersionPanel from '@/components/VersionPanel.vue'
-import { UserFilled, ArrowDown } from '@element-plus/icons-vue'
+import RecycleBin from '@/components/RecycleBin.vue'   // 新增回收站组件
+import { UserFilled, ArrowDown, Delete } from '@element-plus/icons-vue'
+
+/* ====== 【替换API】根据实际路径调整 ====== */
 import { getDocDetail } from '@/api/doc'
 
 const router = useRouter()
@@ -86,8 +108,12 @@ const userStore = useUserStore()
 const themeStore = useThemeStore()
 const dirTreeRef = ref()
 const versionPanelRef = ref()
+const recycleBinRef = ref()
 const currentDocId = ref(null)
 const isCollapsed = ref(false)
+
+// 当前视图：'doc' 或 'recycle'
+const currentView = ref('doc')
 
 const userName = computed(() => {
   return userStore.currentUser?.nickname || userStore.currentUser?.username || '用户'
@@ -100,41 +126,36 @@ async function handleSelectDoc(docId) {
     currentDocId.value = null
     return
   }
+  currentView.value = 'doc'   // 切回文档视图
   try {
+    /* 【替换API】验证文档是否存在 */
     await getDocDetail(docId)
     currentDocId.value = docId
     currentPath.value = `知识库 > 文档 ${docId}`
   } catch (error) {
-    if (dirTreeRef.value) {
-      dirTreeRef.value.loadTree()
-    }
+    if (dirTreeRef.value) dirTreeRef.value.loadTree()
   }
 }
 
 async function handleDocCreated(docId) {
-  if (dirTreeRef.value) {
-    await dirTreeRef.value.loadTree()
-  }
-  if (docId) {
-    await handleSelectDoc(docId)
-  }
+  if (dirTreeRef.value) await dirTreeRef.value.loadTree()
+  if (docId) await handleSelectDoc(docId)
 }
 
 function handleDocUpdated() {
-  if (dirTreeRef.value) {
-    dirTreeRef.value.loadTree()
-  }
-  // 刷新版本历史列表
-  if (versionPanelRef.value) {
-    versionPanelRef.value.loadVersions()
-  }
+  if (dirTreeRef.value) dirTreeRef.value.loadTree()
+  if (versionPanelRef.value) versionPanelRef.value.loadVersions()
 }
 
 async function handleRestoreVersion(content) {
-  // 版本恢复后重新加载文档，以便刷新编辑器内容
-  if (currentDocId.value) {
-    await handleSelectDoc(currentDocId.value)
-  }
+  if (currentDocId.value) await handleSelectDoc(currentDocId.value)
+}
+
+function showRecycleBin() {
+  currentView.value = 'recycle'
+  currentPath.value = '回收站'
+  // 每次进入回收站自动刷新列表
+  if (recycleBinRef.value) recycleBinRef.value.fetchList()
 }
 
 function toggleSidebar() {
@@ -148,9 +169,7 @@ function handleLogout() {
 
 onMounted(() => {
   const token = localStorage.getItem('token')
-  if (!token) {
-    router.push('/login')
-  }
+  if (!token) router.push('/login')
 })
 </script>
 
@@ -161,8 +180,6 @@ onMounted(() => {
   overflow: hidden;
   background: #f5f7fa;
 }
-
-/* 侧边栏 */
 .sidebar {
   width: 280px;
   background: #fff;
@@ -192,10 +209,7 @@ onMounted(() => {
   overflow: hidden;
   flex: 1;
 }
-.logo-icon {
-  font-size: 22px;
-  flex-shrink: 0;
-}
+.logo-icon { font-size: 22px; flex-shrink: 0; }
 .logo-text {
   font-size: 16px;
   font-weight: 600;
@@ -211,17 +225,36 @@ onMounted(() => {
 .sidebar-content {
   flex: 1;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.sidebar-menu {
+  border-top: 1px solid #e4e7ed;
+  padding: 8px;
+}
+.menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+}
+.menu-item:hover {
+  background: #f5f7fa;
+}
+.menu-item.active {
+  background: #ecf5ff;
+  color: #409eff;
 }
 
-/* 主容器 */
 .main-container {
   flex: 1;
   display: flex;
   flex-direction: column;
   overflow: hidden;
 }
-
-/* 头部 */
 .header {
   height: 56px;
   background: #fff;
@@ -232,20 +265,9 @@ onMounted(() => {
   padding: 0 20px;
   flex-shrink: 0;
 }
-.header-left {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-.current-path {
-  font-size: 14px;
-  color: #606266;
-}
-.header-right {
-  display: flex;
-  align-items: center;
-  gap: 20px;
-}
+.header-left { display: flex; align-items: center; gap: 12px; }
+.current-path { font-size: 14px; color: #606266; }
+.header-right { display: flex; align-items: center; gap: 20px; }
 .user-avatar {
   display: flex;
   align-items: center;
@@ -254,11 +276,8 @@ onMounted(() => {
   padding: 4px 8px;
   border-radius: 20px;
 }
-.user-avatar:hover {
-  background: #f5f7fa;
-}
+.user-avatar:hover { background: #f5f7fa; }
 
-/* 内容区 */
 .content-area {
   flex: 1;
   overflow: hidden;
@@ -269,10 +288,7 @@ onMounted(() => {
   height: 100%;
   gap: 16px;
 }
-.editor-pane {
-  flex: 1;
-  overflow: hidden;
-}
+.editor-pane { flex: 1; overflow: hidden; }
 .version-pane {
   width: 280px;
   background: #fff;
@@ -287,5 +303,11 @@ onMounted(() => {
   height: 100%;
   background: #fff;
   border-radius: 12px;
+}
+.page-view {
+  height: 100%;
+  background: #fff;
+  border-radius: 12px;
+  overflow: hidden;
 }
 </style>
