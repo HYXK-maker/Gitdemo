@@ -1,5 +1,5 @@
 <template>
-  <div class="main-layout">
+  <div class="main-layout" :class="{ dark: themeStore.isDark }">
     <!-- 侧边栏 - 折叠后更窄 -->
     <div class="sidebar" :class="{ collapsed: isCollapsed }">
       <div class="sidebar-header">
@@ -28,6 +28,10 @@
           <span class="current-path">{{ currentPath }}</span>
         </div>
         <div class="header-right">
+          <!-- 主题切换按钮 -->
+          <el-button @click="themeStore.toggle" circle>
+            {{ themeStore.isDark ? '☀️' : '🌙' }}
+          </el-button>
           <el-dropdown trigger="click">
             <div class="user-avatar">
               <el-avatar :size="32" :icon="UserFilled" />
@@ -44,12 +48,20 @@
       </div>
 
       <div class="content-area">
-        <DocEditor
-          v-if="currentDocId"
-          :key="currentDocId"
-          :docId="currentDocId"
-          @doc-updated="handleDocUpdated"
-        />
+        <div v-if="currentDocId" class="doc-workspace">
+          <DocEditor
+            :key="currentDocId"
+            :docId="currentDocId"
+            @doc-updated="handleDocUpdated"
+            class="editor-pane"
+          />
+          <VersionPanel
+            ref="versionPanelRef"
+            :docId="currentDocId"
+            @restore="handleRestoreVersion"
+            class="version-pane"
+          />
+        </div>
         <div v-else class="empty-state">
           <el-empty description="请在左侧选择或创建文档" :image-size="120" />
         </div>
@@ -62,14 +74,18 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
+import { useThemeStore } from '@/stores/theme'
 import DirTree from '@/components/DirTree.vue'
 import DocEditor from '@/components/DocEditor.vue'
+import VersionPanel from '@/components/VersionPanel.vue'
 import { UserFilled, ArrowDown } from '@element-plus/icons-vue'
-import { getDocDetail } from '@/api/doc'  // 【新增】引入获取文档详情的API
+import { getDocDetail } from '@/api/doc'
 
 const router = useRouter()
 const userStore = useUserStore()
+const themeStore = useThemeStore()
 const dirTreeRef = ref()
+const versionPanelRef = ref()
 const currentDocId = ref(null)
 const isCollapsed = ref(false)
 
@@ -80,19 +96,15 @@ const userName = computed(() => {
 const currentPath = ref('知识库')
 
 async function handleSelectDoc(docId) {
-  console.log('选中文档:', docId)
   if (!docId) {
     currentDocId.value = null
     return
   }
-  // 【修改】先去尝试获取文档详情，确认文档存在
   try {
     await getDocDetail(docId)
     currentDocId.value = docId
     currentPath.value = `知识库 > 文档 ${docId}`
   } catch (error) {
-    console.error('获取文档详情失败:', error)
-    // 如果获取失败，可能是文档已被删除，刷新树
     if (dirTreeRef.value) {
       dirTreeRef.value.loadTree()
     }
@@ -100,8 +112,6 @@ async function handleSelectDoc(docId) {
 }
 
 async function handleDocCreated(docId) {
-  console.log('文档创建成功:', docId)
-  // 【修改】创建成功后，刷新目录树并自动打开新文档
   if (dirTreeRef.value) {
     await dirTreeRef.value.loadTree()
   }
@@ -111,9 +121,19 @@ async function handleDocCreated(docId) {
 }
 
 function handleDocUpdated() {
-  // 文档更新后可以刷新目录树（比如重命名等情况）
   if (dirTreeRef.value) {
-    dirTreeRef.value.loadTree()  // 【修复】方法名改为 loadTree
+    dirTreeRef.value.loadTree()
+  }
+  // 刷新版本历史列表
+  if (versionPanelRef.value) {
+    versionPanelRef.value.loadVersions()
+  }
+}
+
+async function handleRestoreVersion(content) {
+  // 版本恢复后重新加载文档，以便刷新编辑器内容
+  if (currentDocId.value) {
+    await handleSelectDoc(currentDocId.value)
   }
 }
 
@@ -142,7 +162,7 @@ onMounted(() => {
   background: #f5f7fa;
 }
 
-/* 侧边栏 - 折叠后宽度 52px */
+/* 侧边栏 */
 .sidebar {
   width: 280px;
   background: #fff;
@@ -152,11 +172,9 @@ onMounted(() => {
   transition: width 0.3s ease;
   flex-shrink: 0;
 }
-
 .sidebar.collapsed {
   width: 52px;
 }
-
 .sidebar-header {
   height: 56px;
   padding: 0 12px;
@@ -166,7 +184,6 @@ onMounted(() => {
   border-bottom: 1px solid #f0f0f0;
   flex-shrink: 0;
 }
-
 .logo {
   display: flex;
   align-items: center;
@@ -175,26 +192,22 @@ onMounted(() => {
   overflow: hidden;
   flex: 1;
 }
-
 .logo-icon {
   font-size: 22px;
   flex-shrink: 0;
 }
-
 .logo-text {
   font-size: 16px;
   font-weight: 600;
   color: #409eff;
   white-space: nowrap;
 }
-
 .toggle-btn {
   flex-shrink: 0;
   width: 28px;
   height: 28px;
   padding: 0;
 }
-
 .sidebar-content {
   flex: 1;
   overflow: hidden;
@@ -219,24 +232,20 @@ onMounted(() => {
   padding: 0 20px;
   flex-shrink: 0;
 }
-
 .header-left {
   display: flex;
   align-items: center;
   gap: 12px;
 }
-
 .current-path {
   font-size: 14px;
   color: #606266;
 }
-
 .header-right {
   display: flex;
   align-items: center;
   gap: 20px;
 }
-
 .user-avatar {
   display: flex;
   align-items: center;
@@ -245,7 +254,6 @@ onMounted(() => {
   padding: 4px 8px;
   border-radius: 20px;
 }
-
 .user-avatar:hover {
   background: #f5f7fa;
 }
@@ -256,7 +264,22 @@ onMounted(() => {
   overflow: hidden;
   padding: 16px;
 }
-
+.doc-workspace {
+  display: flex;
+  height: 100%;
+  gap: 16px;
+}
+.editor-pane {
+  flex: 1;
+  overflow: hidden;
+}
+.version-pane {
+  width: 280px;
+  background: #fff;
+  border-left: 1px solid #e4e7ed;
+  border-radius: 8px;
+  overflow-y: auto;
+}
 .empty-state {
   display: flex;
   justify-content: center;
