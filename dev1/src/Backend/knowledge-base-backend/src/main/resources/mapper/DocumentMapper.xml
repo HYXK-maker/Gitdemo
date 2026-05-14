@@ -11,6 +11,10 @@
         <result column="update_time" property="updateTime"/>
     </resultMap>
 
+    <select id="findAll" resultMap="BaseResultMap">
+        SELECT * FROM document ORDER BY update_time DESC
+    </select>
+
     <select id="findByDirectoryId" resultMap="BaseResultMap">
         SELECT * FROM document WHERE directory_id = #{directoryId} ORDER BY update_time DESC
     </select>

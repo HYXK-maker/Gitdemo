@@ -74,7 +74,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getDirTree, createDir, renameDir, deleteDir } from '@/api/dir'
-import { createDoc } from '@/api/doc'
+import { createDoc, deleteDoc, renameDoc } from '@/api/doc'
 import TreeNode from './TreeNode.vue'
 
 const emit = defineEmits(['select-doc'])
@@ -135,7 +135,6 @@ async function loadTree() {
 
 function toggleExpand(id) {
   expandedMap.value[id] = !expandedMap.value[id]
-
   expandedMap.value = { ...expandedMap.value }
 }
 
@@ -185,7 +184,6 @@ async function confirmCreate() {
   }
 }
 
-
 function handleSelect(node) {
   selectedId.value = node.id
   if (node.type === 'doc') {
@@ -207,14 +205,17 @@ function handleCommand(cmd, node) {
   }
 }
 
-
 async function confirmRename() {
   if (!renameName.value.trim()) {
     ElMessage.warning('请输入名称')
     return
   }
   try {
-    await renameDir(renameItem.value.id, renameName.value)
+    if (renameItem.value.type === 'doc') {
+      await renameDoc(renameItem.value.id, renameName.value)
+    } else {
+      await renameDir(renameItem.value.id, renameName.value)
+    }
     ElMessage.success('重命名成功')
     renameVisible.value = false
     await loadTree()
@@ -230,7 +231,12 @@ async function deleteNode(node) {
       '警告',
       { type: 'warning' }
     )
-    await deleteDir(node.id)
+    // 修复：根据节点类型调用对应的删除接口
+    if (node.type === 'doc') {
+      await deleteDoc(node.id)
+    } else {
+      await deleteDir(node.id)
+    }
     ElMessage.success('删除成功')
     if (selectedId.value === node.id) {
       selectedId.value = null
@@ -243,7 +249,6 @@ async function deleteNode(node) {
     }
   }
 }
-
 
 function showContextMenu(event, node) {
   event.preventDefault()
