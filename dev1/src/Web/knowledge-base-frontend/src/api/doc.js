@@ -26,3 +26,11 @@ export function renameDoc(id, title) {
 export function deleteDoc(id) {
   return request.post('/doc/delete', { id })
 }
+// 获取文档版本列表
+export function getDocVersions(docId) {
+  return request.get(`/doc/${docId}/versions`)
+}
+// 获取特定版本内容
+export function getVersionContent(versionId) {
+  return request.get(`/doc/versions/${versionId}`)
+}
