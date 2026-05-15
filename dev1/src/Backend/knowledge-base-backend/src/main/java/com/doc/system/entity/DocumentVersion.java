@@ -1,12 +1,12 @@
 package com.doc.system.entity;
-
+import java.time.LocalDateTime;
 public class DocumentVersion {
     private Long id;
     private Long docId;
     private String content;
     private Integer versionNum;
     private Long operatorId;
-    private String createTime;
+    private LocalDateTime createTime;
     private String versionNote;
 
     public Long getId() { return id; }
@@ -24,8 +24,8 @@ public class DocumentVersion {
     public Long getOperatorId() { return operatorId; }
     public void setOperatorId(Long operatorId) { this.operatorId = operatorId; }
 
-    public String getCreateTime() { return createTime; }
-    public void setCreateTime(String createTime) { this.createTime = createTime; }
+    public LocalDateTime getCreateTime() { return createTime; }
+    public void setCreateTime(LocalDateTime createTime) { this.createTime = createTime; }
 
     public String getVersionNote() { return versionNote; }
     public void setVersionNote(String versionNote) { this.versionNote = versionNote; }

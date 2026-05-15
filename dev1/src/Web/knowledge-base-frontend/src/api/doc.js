@@ -20,32 +20,28 @@ export function saveDoc(data) {
 }
 
 export function renameDoc(id, title) {
-  return request.post('/doc/rename', { id, title })
+  return request.post('/doc/rename', {id, title})
 }
 
 export function deleteDoc(id) {
-  return request.post('/doc/delete', { id })
+  return request.post('/doc/delete', {id})
 }
 
-// 获取文档版本列表
 export function getDocVersions(docId) {
   return request.get(`/doc/${docId}/versions`)
 }
 
-// 获取特定版本内容
 export function getVersionContent(versionId) {
   return request.get(`/doc/versions/${versionId}`)
 }
 
-// 创建文档新版本
-export function createDocVersion(docId, content, note) {
+export function createDocVersion(docId, data) {
   return request.post(`/doc/${docId}/version`, {
-    content: content,
-    versionNote: note || ''
+    content: data.content,
+    versionNote: data.versionNote || ''
   })
 }
 
-// 更新文档信息
 export function updateDoc(id, data) {
-  return request.post('/doc/update', { id, ...data })
+  return request.post('/doc/update', {id, ...data})
 }

@@ -16,18 +16,12 @@ export default defineConfig({
       '/api/dir': {
         target: 'http://localhost:8080',
         changeOrigin: true,
-        rewrite: (path) => path
       },
       '/api/doc': {
         target: 'http://localhost:8080',
         changeOrigin: true,
-        rewrite: (path) => path
-      },
-      '/api': {
-        target: 'http://localhost:8081',
-        changeOrigin: true,
-        rewrite: (path) => path
       }
+      // 删除 /api 通用规则，或者也指向 8080
     }
   }
 })

@@ -2,6 +2,8 @@ package com.doc.system.mapper;
 
 import com.doc.system.entity.Document;
 import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Update;
 import java.util.List;
 
 @Mapper
@@ -11,7 +13,10 @@ public interface DocumentMapper {
     List<Document> findByDirectoryId(Long directoryId);
     Document findById(Long id);
     int insert(Document doc);
-    int updateContent(Long id, String content);
-    int updateTitle(Long id, String title);
+
+    int updateContent(@Param("id") Long id, @Param("content") String content);
+
+    int updateTitle(@Param("id") Long id, @Param("title") String title);
+
     int deleteById(Long id);
 }

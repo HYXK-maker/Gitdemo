@@ -18,7 +18,6 @@
       </div>
     </div>
 
-    <!-- 新建对话框 -->
     <el-dialog v-model="dialogVisible" :title="dialogTitle" width="400px">
       <el-input v-model="dialogName" :placeholder="dialogPlaceholder" @keyup.enter="confirmCreate" />
       <template #footer>
@@ -27,7 +26,6 @@
       </template>
     </el-dialog>
 
-    <!-- 重命名对话框 -->
     <el-dialog v-model="renameVisible" title="重命名" width="400px">
       <el-input v-model="renameName" placeholder="请输入新名称" @keyup.enter="confirmRename" />
       <template #footer>
@@ -36,7 +34,7 @@
       </template>
     </el-dialog>
 
-    <!-- 移动目录弹窗 -->
+
     <el-dialog v-model="moveDialogVisible" title="移动到..." width="400px">
       <el-tree
         :data="moveTreeData"
@@ -52,7 +50,6 @@
       </template>
     </el-dialog>
 
-    <!-- 右键菜单 -->
     <div v-if="menuVisible" class="context-menu" :style="{ left: menuX + 'px', top: menuY + 'px' }">
       <div v-if="menuItem?.type === 'dir'" class="menu-item" @click="menuCreateDir">📁 新建子目录</div>
       <div v-if="menuItem?.type === 'dir'" class="menu-item" @click="menuCreateDoc">📄 新建文档</div>
@@ -139,13 +136,11 @@ async function confirmCreate() {
       if (docId) emit('doc-created', docId)
     }
     dialogVisible.value = false
-    // 展开父目录
     if (dialogParent.value) {
       expandedMap.value[dialogParent.value.id] = true
     }
-    // 重新加载
     await loadTree()
-    // 再次确保父目录展开
+
     if (dialogParent.value) {
       expandedMap.value[dialogParent.value.id] = true
       expandedMap.value = { ...expandedMap.value }

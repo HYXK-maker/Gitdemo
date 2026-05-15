@@ -12,7 +12,6 @@ export const useThemeStore = defineStore('theme', () => {
   function apply() {
     document.documentElement.setAttribute('data-theme', isDark.value ? 'dark' : 'light')
   }
-  // 初始化立即应用
   apply()
   return { isDark, toggle }
 })

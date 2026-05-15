@@ -95,33 +95,29 @@ async function handleSave() {
   if (!doc.value) return
   saving.value = true
   try {
-    const updateRes = await updateDoc(props.docId, {
+    await updateDoc(props.docId, {
       title: titleDraft.value || doc.value.title,
       content: content.value
     })
-    console.log('updateDoc 成功:', updateRes)
 
     try {
-      const versionRes = await createDocVersion(props.docId, content.value, '保存于 ' + new Date().toLocaleString())
-      console.log('createDocVersion 成功:', versionRes)
+      await createDocVersion(props.docId, {
+        content: content.value,
+        versionNote: '保存于 ' + new Date().toLocaleString()
+      })
     } catch (e) {
-      console.error('createDocVersion 失败 - 状态码:', e.response?.status)
-      console.error('createDocVersion 失败 - 返回数据:', e.response?.data)
-      console.error('createDocVersion 失败 - 完整错误:', e)
+      console.error('创建版本失败:', e)
     }
 
     ElMessage.success('保存成功')
     emit('doc-updated')
   } catch (err) {
-    console.error('updateDoc 失败 - 状态码:', err.response?.status)
-    console.error('updateDoc 失败 - 返回数据:', err.response?.data)
-    console.error('updateDoc 失败 - 完整错误:', err)
+    console.error('保存失败:', err)
     ElMessage.error('保存失败，请重试')
   } finally {
     saving.value = false
   }
 }
-
 function startEditTitle() {
   titleDraft.value = doc.value.title || ''
   editingTitle.value = true

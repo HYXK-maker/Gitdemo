@@ -1,8 +1,4 @@
-<!--
-  文件：src/components/RecycleBin.vue
-  说明：回收站页面，展示已删除的文档/目录，支持恢复和彻底删除
-  ⚠️ 需要替换的 API 已在代码中用 【替换API】 标注
--->
+
 
 <template>
   <div class="recycle-bin">
@@ -39,7 +35,6 @@
 import { ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 
-/* ====== 【替换API】请替换为你项目中的真实导入路径 ====== */
 import { getRecycleList } from '@/api/recycle'            // 获取回收站列表
 import { restoreFromRecycle } from '@/api/recycle'        // 恢复
 import { permanentDeleteFromRecycle } from '@/api/recycle' // 永久删除
@@ -50,7 +45,6 @@ const loading = ref(false)
 async function fetchList() {
   loading.value = true
   try {
-    /* 【替换API】GET /api/recycle/list */
     const res = await getRecycleList()
     recycleList.value = res.data || []
   } catch (e) {
@@ -62,7 +56,6 @@ async function fetchList() {
 
 async function restoreItem(row) {
   try {
-    /* 【替换API】POST /api/recycle/restore  { id } */
     await restoreFromRecycle(row.id)
     ElMessage.success('已恢复')
     fetchList()
@@ -73,7 +66,6 @@ async function restoreItem(row) {
 
 async function permanentDelete(row) {
   try {
-    /* 【替换API】DELETE /api/recycle/permanent  { id } */
     await permanentDeleteFromRecycle(row.id)
     ElMessage.success('已彻底删除')
     fetchList()

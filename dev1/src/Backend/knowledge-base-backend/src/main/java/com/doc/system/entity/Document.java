@@ -8,9 +8,15 @@ public class Document {
     private String content;
     private Long directoryId;
     private Long userId;
+    private Long lastEditUserId;    // 新增
+    private LocalDateTime lastEditTime;
     private LocalDateTime createTime;
     private LocalDateTime updateTime;
+    public Long getLastEditUserId() { return lastEditUserId; }
+    public void setLastEditUserId(Long lastEditUserId) { this.lastEditUserId = lastEditUserId; }
 
+    public LocalDateTime getLastEditTime() { return lastEditTime; }
+    public void setLastEditTime(LocalDateTime lastEditTime) { this.lastEditTime = lastEditTime; }
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
     public String getTitle() { return title; }

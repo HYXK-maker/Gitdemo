@@ -92,7 +92,7 @@ import VersionPanel from '@/components/VersionPanel.vue'
 import RecycleBin from '@/components/RecycleBin.vue'
 import { UserFilled, ArrowDown, Delete, FolderAdd, DocumentAdd } from '@element-plus/icons-vue'
 import { getDocDetail } from '@/api/doc'
-
+import { ElMessage } from 'element-plus'
 const router = useRouter()
 const userStore = useUserStore()
 const themeStore = useThemeStore()
@@ -133,7 +133,14 @@ function handleDocUpdated() {
 }
 
 async function handleRestoreVersion(content) {
-  if (currentDocId.value) await handleSelectDoc(currentDocId.value)
+  await handleSelectDoc(currentDocId.value)
+  setTimeout(() => {
+    const editor = document.querySelector('.ql-editor')
+    if (editor) {
+      editor.innerHTML = content
+      ElMessage.success('版本内容已加载，请点击保存')
+    }
+  }, 500)
 }
 
 function showRecycleBin() {
