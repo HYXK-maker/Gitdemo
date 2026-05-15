@@ -19,7 +19,6 @@
         没有账号？<router-link to="/register">立即注册</router-link>
       </div>
       <div class="demo-tip">
-        演示账号：admin / 123456
       </div>
     </el-card>
   </div>
