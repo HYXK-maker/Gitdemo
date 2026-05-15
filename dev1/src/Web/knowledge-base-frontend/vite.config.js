@@ -13,6 +13,10 @@ export default defineConfig({
     port: 3000,
     historyApiFallback: true,
     proxy: {
+      '/api/auth': {
+        target: 'http://localhost:8081',
+        changeOrigin: true,
+      },
       '/api/dir': {
         target: 'http://localhost:8080',
         changeOrigin: true,
@@ -21,7 +25,6 @@ export default defineConfig({
         target: 'http://localhost:8080',
         changeOrigin: true,
       }
-      // 删除 /api 通用规则，或者也指向 8080
     }
   }
 })

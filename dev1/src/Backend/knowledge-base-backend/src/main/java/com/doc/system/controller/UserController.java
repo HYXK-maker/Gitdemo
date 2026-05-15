@@ -19,7 +19,6 @@ public class UserController {
         return Result.success(token);
     }
 
-    // 添加注册接口
     @PostMapping("/register")
     public Result<String> register(@RequestBody User user) {
         // 调用 UserService 的注册方法

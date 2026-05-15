@@ -15,7 +15,6 @@ const router = createRouter({
   routes
 })
 
-// 修复路由守卫 - 不使用 next 回调，直接返回
 router.beforeEach((to, from) => {
   const token = localStorage.getItem('token')
 

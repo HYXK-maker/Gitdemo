@@ -22,12 +22,10 @@ export const useUserStore = defineStore('user', () => {
           localStorage.setItem('userId', data.userId.toString())
         }
 
-        // 存储用户名
         const name = data.username || form.username
         username.value = name
         localStorage.setItem('username', name)
 
-        // 存储完整用户对象
         currentUser.value = { username: name }
         localStorage.setItem('currentUser', JSON.stringify(currentUser.value))
 

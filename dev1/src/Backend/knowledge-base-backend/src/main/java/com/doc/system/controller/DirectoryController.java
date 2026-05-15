@@ -75,7 +75,6 @@ public class DirectoryController {
         return tree;
     }
 
-    // 递归将 Directory 树转换为 Map 树
     private List<Map<String, Object>> convertDirectoryTree(List<Directory> dirList) {
         List<Map<String, Object>> result = new ArrayList<>();
         for (Directory dir : dirList) {
@@ -91,7 +90,6 @@ public class DirectoryController {
         return result;
     }
 
-    // 递归构建全量 dirMap（用于文档挂载）
     private Map<Long, Map<String, Object>> buildDirMapRecursive(List<Map<String, Object>> nodes) {
         Map<Long, Map<String, Object>> map = new LinkedHashMap<>();
         for (Map<String, Object> node : nodes) {
