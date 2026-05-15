@@ -17,7 +17,13 @@
     </select>
 
     <select id="findByUserId" resultMap="BaseResultMap">
-        SELECT * FROM directory WHERE user_id = #{userId} ORDER BY type, name
+        SELECT * FROM directory
+        <where>
+            <if test="userId != null">
+                user_id = #{userId}
+            </if>
+        </where>
+        ORDER BY type, name
     </select>
 
     <select id="findById" resultMap="BaseResultMap">

@@ -38,11 +38,14 @@ export function getVersionContent(versionId) {
 }
 
 // 创建文档新版本
-export function createDocVersion(docId, data) {
-  return request.post(`/doc/${docId}/version`, data)
+export function createDocVersion(docId, content, note) {
+  return request.post(`/doc/${docId}/version`, {
+    content: content,
+    versionNote: note || ''
+  })
 }
 
-// 更新文档信息（新增）
+// 更新文档信息
 export function updateDoc(id, data) {
   return request.post('/doc/update', { id, ...data })
 }

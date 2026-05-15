@@ -26,3 +26,7 @@ export function moveDir(id, targetParentId) {
   // 暂未实现
   return Promise.resolve({ success: true })
 }
+// 移动目录
+export function moveDirectory(data) {
+  return request.post('/dir/move', data)
+}

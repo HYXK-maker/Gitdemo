@@ -1,8 +1,3 @@
-<!--
-  文件：src/components/DocEditor.vue
-  功能：富文本编辑，支持加粗、斜体、列表等，保存 HTML 内容
--->
-
 <template>
   <div class="doc-editor">
     <div v-if="loading" class="loading">
@@ -25,19 +20,19 @@
         />
         <div class="actions">
           <el-button type="primary" @click="handleSave" :loading="saving">
-            <el-icon><Check /></el-icon>保存
+            保存
           </el-button>
         </div>
       </div>
 
-      <!-- ====== 替换为 Quill 富文本编辑器 ====== -->
       <div class="editor-body">
         <QuillEditor
           v-model:content="content"
           content-type="html"
           theme="snow"
           :toolbar="toolbarOptions"
-          style="height: calc(100vh - 200px)"
+          style="height: 100%"
+        />
         />
       </div>
     </template>
@@ -52,8 +47,6 @@ import { ref, watch, nextTick } from 'vue'
 import { ElMessage } from 'element-plus'
 import { QuillEditor } from '@vueup/vue-quill'
 import 'quill/dist/quill.snow.css'
-
-/* ====== 【替换API】根据你项目中的实际路径调整 ====== */
 import { getDocDetail, updateDoc, createDocVersion } from '@/api/doc'
 
 const props = defineProps({
@@ -73,7 +66,6 @@ const titleInputRef = ref(null)
 const loading = ref(false)
 const saving = ref(false)
 
-// Quill 工具栏选项
 const toolbarOptions = [
   ['bold', 'italic', 'underline', 'strike'],
   [{ 'header': 1 }, { 'header': 2 }],
@@ -87,7 +79,6 @@ async function loadDoc() {
   if (!props.docId) return
   loading.value = true
   try {
-    /* 【替换API】获取文档详情 */
     const res = await getDocDetail(props.docId)
     doc.value = res.data || res
     content.value = doc.value.content || ''
@@ -102,25 +93,29 @@ async function loadDoc() {
 
 async function handleSave() {
   if (!doc.value) return
-  if (!content.value.replace(/<[^>]*>?/gm, '').trim()) {
-    ElMessage.warning('内容不能为空')
-    return
-  }
   saving.value = true
   try {
-    /* 【替换API】更新文档内容（content 为 HTML 字符串） */
-    await updateDoc(props.docId, {
+    const updateRes = await updateDoc(props.docId, {
       title: titleDraft.value || doc.value.title,
       content: content.value
     })
-    // 尝试创建版本（若后端未实现版本功能，失败时静默忽略）
+    console.log('updateDoc 成功:', updateRes)
+
     try {
-      /* 【替换API】创建文档版本（可选） */
-      await createDocVersion(props.docId, content.value, `用户保存于 ${new Date().toLocaleString()}`)
-    } catch (versionErr) { /* 静默 */ }
+      const versionRes = await createDocVersion(props.docId, content.value, '保存于 ' + new Date().toLocaleString())
+      console.log('createDocVersion 成功:', versionRes)
+    } catch (e) {
+      console.error('createDocVersion 失败 - 状态码:', e.response?.status)
+      console.error('createDocVersion 失败 - 返回数据:', e.response?.data)
+      console.error('createDocVersion 失败 - 完整错误:', e)
+    }
+
     ElMessage.success('保存成功')
     emit('doc-updated')
   } catch (err) {
+    console.error('updateDoc 失败 - 状态码:', err.response?.status)
+    console.error('updateDoc 失败 - 返回数据:', err.response?.data)
+    console.error('updateDoc 失败 - 完整错误:', err)
     ElMessage.error('保存失败，请重试')
   } finally {
     saving.value = false
@@ -139,7 +134,6 @@ async function saveTitle() {
   editingTitle.value = false
   doc.value.title = titleDraft.value
   try {
-    /* 【替换API】更新标题 */
     await updateDoc(props.docId, {
       title: titleDraft.value,
       content: content.value
@@ -165,44 +159,24 @@ watch(() => props.docId, (newId) => {
   background: #fff;
   border-radius: 8px;
   overflow: hidden;
-  box-shadow: 0 2px 12px rgba(0,0,0,0.04);
+  transition: background 0.3s;
 }
-.loading {
-  padding: 32px;
-}
+.loading { padding: 32px; }
 .toolbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 16px 24px;
+  padding: 12px 20px;
   border-bottom: 1px solid #ebeef5;
-  gap: 16px;
-}
-.doc-title {
-  font-size: 20px;
-  font-weight: 600;
-  margin: 0;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: #303133;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.title-input {
-  max-width: 400px;
-}
-.actions {
-  display: flex;
-  gap: 8px;
   flex-shrink: 0;
+  transition: border-color 0.3s;
 }
+.doc-title { font-size: 18px; font-weight: 600; margin: 0; }
+.title-input { max-width: 300px; }
 .editor-body {
   flex: 1;
-  overflow: auto;
+  overflow: hidden;
+  min-height: 0;
 }
-.error {
-  padding: 40px;
-}
+.error { padding: 40px; }
 </style>

@@ -3,13 +3,13 @@ package com.doc.system.controller;
 import com.doc.system.entity.Directory;
 import com.doc.system.entity.Document;
 import com.doc.system.service.DirectoryService;
+import com.doc.system.mapper.DirectoryMapper;
 import com.doc.system.mapper.DocumentMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import javax.servlet.http.HttpServletRequest;
 import java.util.*;
-import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/dir")
@@ -19,40 +19,38 @@ public class DirectoryController {
     private DirectoryService directoryService;
 
     @Autowired
+    private DirectoryMapper directoryMapper;
+
+    @Autowired
     private DocumentMapper documentMapper;
 
-    /** 获取当前用户ID（从请求头 X-User-Id 中获取，前端登录后携带） */
     private Long getCurrentUserId(HttpServletRequest request) {
         String userIdStr = request.getHeader("X-User-Id");
         if (userIdStr != null) {
             return Long.valueOf(userIdStr);
         }
-        // 临时兼容：如果没有携带用户ID，默认返回所有数据（后续严格限制）
         return null;
     }
 
-    /** 获取包含目录和文档的完整树（仅当前用户） */
     @GetMapping("/tree")
     public List<Map<String, Object>> getTree(HttpServletRequest request) {
         Long userId = getCurrentUserId(request);
-        List<Directory> dirs = directoryService.getTreeByUser(userId);
-        List<Document> docs = (userId != null) 
-                ? documentMapper.findByUserId(userId) 
+
+        // 获取已构建好的目录树（根节点列表，含嵌套 children）
+        List<Directory> dirs = (userId != null)
+                ? directoryService.getTreeByUser(userId)
+                : directoryService.getTreeByUser(null);  // 或查全部
+
+        // 查文档
+        List<Document> docs = (userId != null)
+                ? documentMapper.findByUserId(userId)
                 : documentMapper.findAll();
 
-        // 将目录转为 Map 列表
-        List<Map<String, Object>> tree = dirs.stream().map(dir -> {
-            Map<String, Object> node = new HashMap<>();
-            node.put("id", dir.getId());
-            node.put("name", dir.getName());
-            node.put("type", "dir");
-            node.put("parentId", dir.getParentId());
-            node.put("children", dir.getChildren() != null ?
-                    dir.getChildren().stream().map(this::dirToMap).collect(Collectors.toList()) : new ArrayList<>());
-            return node;
-        }).collect(Collectors.toList());
+        // 递归转换目录树为前端需要的 Map 结构
+        List<Map<String, Object>> tree = convertDirectoryTree(dirs);
 
-        // 将每个文档挂载到对应的目录节点下
+        // 挂载文档
+        Map<Long, Map<String, Object>> dirMap = buildDirMapRecursive(tree); // 递归收集所有目录节点
         for (Document doc : docs) {
             Map<String, Object> docNode = new HashMap<>();
             docNode.put("id", doc.getId());
@@ -62,40 +60,49 @@ public class DirectoryController {
             docNode.put("parentId", doc.getDirectoryId());
 
             Long parentId = doc.getDirectoryId();
-            if (parentId == 0) {
+            if (parentId == null || parentId == 0) {
                 tree.add(docNode);
             } else {
-                addToParent(tree, parentId, docNode);
+                Map<String, Object> parent = dirMap.get(parentId);
+                if (parent != null) {
+                    ((List<Map<String, Object>>) parent.get("children")).add(docNode);
+                } else {
+                    tree.add(docNode);
+                }
             }
         }
 
         return tree;
     }
 
-    private Map<String, Object> dirToMap(Directory dir) {
-        Map<String, Object> node = new HashMap<>();
-        node.put("id", dir.getId());
-        node.put("name", dir.getName());
-        node.put("type", "dir");
-        node.put("parentId", dir.getParentId());
-        node.put("children", dir.getChildren() != null ?
-                dir.getChildren().stream().map(this::dirToMap).collect(Collectors.toList()) : new ArrayList<>());
-        return node;
+    // 递归将 Directory 树转换为 Map 树
+    private List<Map<String, Object>> convertDirectoryTree(List<Directory> dirList) {
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (Directory dir : dirList) {
+            Map<String, Object> node = new HashMap<>();
+            node.put("id", dir.getId());
+            node.put("name", dir.getName());
+            node.put("type", "dir");
+            node.put("parentId", dir.getParentId());
+            List<Map<String, Object>> children = convertDirectoryTree(dir.getChildren());
+            node.put("children", children);
+            result.add(node);
+        }
+        return result;
     }
 
-    private void addToParent(List<Map<String, Object>> nodes, Long parentId, Map<String, Object> child) {
+    // 递归构建全量 dirMap（用于文档挂载）
+    private Map<Long, Map<String, Object>> buildDirMapRecursive(List<Map<String, Object>> nodes) {
+        Map<Long, Map<String, Object>> map = new LinkedHashMap<>();
         for (Map<String, Object> node : nodes) {
-            if (node.get("id").equals(parentId)) {
-                ((List<Map<String, Object>>) node.get("children")).add(child);
-                return;
-            }
-            if (node.get("children") != null) {
-                addToParent((List<Map<String, Object>>) node.get("children"), parentId, child);
+            map.put((Long) node.get("id"), node);
+            List<Map<String, Object>> children = (List<Map<String, Object>>) node.get("children");
+            if (children != null) {
+                map.putAll(buildDirMapRecursive(children));
             }
         }
+        return map;
     }
-
-    /** POST /api/dir/create  body: { name, parentId } */
     @PostMapping("/create")
     public Map<String, Object> createDir(@RequestBody Map<String, Object> params, HttpServletRequest request) {
         Long userId = getCurrentUserId(request);
@@ -111,7 +118,6 @@ public class DirectoryController {
         return result;
     }
 
-    /** POST /api/dir/rename  body: { id, name } */
     @PostMapping("/rename")
     public String renameDir(@RequestBody Map<String, String> params) {
         Long id = Long.valueOf(params.get("id"));
@@ -120,7 +126,6 @@ public class DirectoryController {
         return "ok";
     }
 
-    /** POST /api/dir/delete  body: { id } */
     @PostMapping("/delete")
     public String deleteDir(@RequestBody Map<String, String> params) {
         Long id = Long.valueOf(params.get("id"));

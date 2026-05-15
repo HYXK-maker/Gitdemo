@@ -6,6 +6,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -17,15 +18,23 @@ public class DirectoryService {
 
     /** 获取指定用户的目录树 */
     public List<Directory> getTreeByUser(Long userId) {
-        List<Directory> all = directoryMapper.findByUserId(userId);
-        return buildTree(all, 0L);
+        // 如果没传用户ID，直接查全部目录
+        List<Directory> all = (userId != null)
+                ? directoryMapper.findByUserId(userId)
+                : directoryMapper.findAll();
+
+        return all.stream()
+                .filter(d -> d.getParentId() == null || d.getParentId() == 0)
+                .peek(d -> d.setChildren(buildChildren(all, d.getId())))
+                .collect(Collectors.toList());
     }
 
-    private List<Directory> buildTree(List<Directory> all, Long parentId) {
-        return all.stream()
-                .filter(d -> d.getParentId().equals(parentId))
-                .peek(d -> d.setChildren(buildTree(all, d.getId())))
+    private List<Directory> buildChildren(List<Directory> all, Long parentId) {
+        List<Directory> children = all.stream()
+                .filter(d -> parentId.equals(d.getParentId()))
+                .peek(d -> d.setChildren(buildChildren(all, d.getId())))
                 .collect(Collectors.toList());
+        return children.isEmpty() ? new ArrayList<>() : children;
     }
 
     /** 创建目录，并指定所属用户 */

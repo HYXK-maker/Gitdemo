@@ -9,7 +9,7 @@
     >
 
       <span
-        v-if="node.type === 'dir' && node.children && node.children.length"
+        v-if="node.type === 'dir' "
         class="expand-icon"
         @click.stop="toggleExpand"
       >
