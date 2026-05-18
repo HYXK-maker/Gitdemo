@@ -1,5 +1,4 @@
 package com.doc.system.controller;
-
 import com.doc.system.entity.User;
 import com.doc.system.mapper.UserMapper;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -9,6 +8,7 @@ import javax.servlet.http.HttpServletRequest;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/admin")
@@ -17,7 +17,6 @@ public class AdminController {
     @Autowired
     private UserMapper userMapper;
 
-    /** 校验当前用户是否为管理员 */
     private boolean isAdmin(HttpServletRequest request) {
         String userIdStr = request.getHeader("X-User-Id");
         if (userIdStr == null) return false;
@@ -26,7 +25,6 @@ public class AdminController {
         return user != null && "admin".equals(user.getRole());
     }
 
-    /** 获取用户列表 */
     @GetMapping("/users")
     public Map<String, Object> listUsers(HttpServletRequest request) {
         if (!isAdmin(request)) {
@@ -35,14 +33,16 @@ public class AdminController {
             err.put("msg", "无权限");
             return err;
         }
-        List<User> users = userMapper.findAll();
+        List<User> users = userMapper.findAll()
+                .stream()
+                .filter(u -> !"admin".equals(u.getUsername()))
+                .collect(Collectors.toList());
         Map<String, Object> result = new HashMap<>();
         result.put("code", 200);
         result.put("data", users);
         return result;
     }
 
-    /** 修改用户角色 */
     @PostMapping("/changeRole")
     public Map<String, Object> changeRole(@RequestBody Map<String, String> params, HttpServletRequest request) {
         if (!isAdmin(request)) {
@@ -60,7 +60,6 @@ public class AdminController {
         return result;
     }
 
-    /** 禁用/启用用户（status: 0启用, 1禁用） */
     @PostMapping("/toggleStatus")
     public Map<String, Object> toggleStatus(@RequestBody Map<String, String> params, HttpServletRequest request) {
         if (!isAdmin(request)) {
@@ -78,7 +77,6 @@ public class AdminController {
         return result;
     }
 
-    /** 删除用户 */
     @PostMapping("/deleteUser")
     public Map<String, Object> deleteUser(@RequestBody Map<String, String> params, HttpServletRequest request) {
         if (!isAdmin(request)) {
