@@ -6,7 +6,6 @@
       <h3 style="margin: 0;">用户管理</h3>
     </div>
     <el-table :data="users" border style="width: 100%">
-      <el-table-column prop="id" label="ID" width="60"></el-table-column>
       <el-table-column prop="username" label="用户名"></el-table-column>
       <el-table-column prop="role" label="角色" width="100">
         <template #default="scope">
