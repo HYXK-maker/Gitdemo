@@ -1,4 +1,6 @@
+
 package com.doc.system.controller;
+
 import com.doc.system.entity.User;
 import com.doc.system.mapper.UserMapper;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -33,8 +35,9 @@ public class AdminController {
             err.put("msg", "无权限");
             return err;
         }
-        List<User> users = userMapper.findAll()
-                .stream()
+        List<User> allUsers = userMapper.findAll();
+        // 只过滤掉 username='admin' 的用户，其他用户都显示
+        List<User> users = allUsers.stream()
                 .filter(u -> !"admin".equals(u.getUsername()))
                 .collect(Collectors.toList());
         Map<String, Object> result = new HashMap<>();
@@ -54,9 +57,14 @@ public class AdminController {
         Long id = Long.valueOf(params.get("id"));
         String role = params.get("role");
         userMapper.updateRole(id, role);
+
+        Long currentUserId = Long.valueOf(request.getHeader("X-User-Id"));
+        boolean selfDemoted = id.equals(currentUserId) && "user".equals(role);
+
         Map<String, Object> result = new HashMap<>();
         result.put("code", 200);
         result.put("msg", "角色修改成功");
+        result.put("selfDemoted", selfDemoted);
         return result;
     }
 

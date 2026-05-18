@@ -1,3 +1,4 @@
+
 <template>
   <div class="admin-panel">
     <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 16px;">
@@ -5,12 +6,12 @@
       <h3 style="margin: 0;">用户管理</h3>
     </div>
     <el-table :data="users" border style="width: 100%">
-
+      <el-table-column prop="id" label="ID" width="60"></el-table-column>
       <el-table-column prop="username" label="用户名"></el-table-column>
       <el-table-column prop="role" label="角色" width="100">
         <template #default="scope">
           <el-tag :type="scope.row.role === 'admin' ? 'danger' : 'info'">
-            {{ scope.row.role }}
+            {{ scope.row.role === 'admin' ? '管理员' : '普通用户' }}
           </el-tag>
         </template>
       </el-table-column>
@@ -37,10 +38,12 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { useUserStore } from '@/stores/user'
 import request from '@/api/request'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
 const router = useRouter()
+const userStore = useUserStore()
 const users = ref([])
 
 function goBack() {
@@ -63,8 +66,17 @@ async function fetchUsers() {
 async function toggleRole(user) {
   const newRole = user.role === 'admin' ? 'user' : 'admin'
   try {
-    await request.post('/admin/changeRole', { id: user.id, role: newRole })
+    const res = await request.post('/admin/changeRole', { id: user.id, role: newRole })
     ElMessage.success('角色已更新')
+    // 如果自己把自己降级了，强制退出
+    if (res.selfDemoted) {
+      ElMessage.warning('您已将自己降级为普通用户，即将退出')
+      setTimeout(() => {
+        userStore.logout()
+        router.push('/login')
+      }, 1000)
+      return
+    }
     fetchUsers()
   } catch (e) {
     ElMessage.error('操作失败')
