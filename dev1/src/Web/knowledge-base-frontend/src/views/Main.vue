@@ -38,8 +38,9 @@
     <!-- 主区域 -->
     <div class="main-container">
       <div class="header">
+        <!-- ★ 修改：不再显示“知识库 > 文档3”，仅显示文档标题 -->
         <div class="header-left">
-          <span class="current-path">{{ currentPath }}</span>
+          <span class="current-doc-title" v-if="currentDocTitle">{{ currentDocTitle }}</span>
         </div>
         <div class="header-right">
           <el-button class="theme-btn" @click="themeStore.toggle" circle>
@@ -106,27 +107,33 @@ const dirTreeRef = ref()
 const versionPanelRef = ref()
 // const recycleBinRef = ref()
 const currentDocId = ref(null)
+const currentDocTitle = ref('')   // ★ 替换原来的 currentPath
 const isCollapsed = ref(false)
 const currentView = ref('doc')
 
 const userName = computed(() => {
   return userStore.currentUser?.nickname || userStore.currentUser?.username || '用户'
 })
-const currentPath = ref('知识库')
 
 function goAdmin() {
   router.push('/admin')
 }
 
 async function handleSelectDoc(docId) {
-  if (!docId) { currentDocId.value = null; return }
+  if (!docId) {
+    currentDocId.value = null
+    currentDocTitle.value = ''              // ★ 清空标题
+    return
+  }
   currentView.value = 'doc'
   try {
-    await getDocDetail(docId)
+    const res = await getDocDetail(docId)   // ★ 获取文档详情以取真实标题
     currentDocId.value = docId
-    currentPath.value = `知识库 > 文档 ${docId}`
+    const doc = res.data || res
+    currentDocTitle.value = doc.title || '未命名文档'   // ★ 只显示文档标题
   } catch (error) {
     console.error('文档加载失败:', error)
+    currentDocTitle.value = ''
     if (dirTreeRef.value) dirTreeRef.value.loadTree()
   }
 }
@@ -291,8 +298,14 @@ onMounted(() => {
 }
 .header-right { display: flex; align-items: center; gap: 16px; }
 .theme-btn { margin-right: 4px; }
-.current-path { font-size: 14px; color: #666; transition: color 0.3s; }
-.main-layout.dark .current-path { color: #aaa; }
+/* ★ 将 current-path 改为 current-doc-title */
+.current-doc-title {
+  font-size: 14px;
+  font-weight: 500;
+  color: #333;
+  transition: color 0.3s;
+}
+.main-layout.dark .current-doc-title { color: #ccc; }
 .user-avatar { display: flex; align-items: center; gap: 8px; cursor: pointer; }
 .user-name { transition: color 0.3s; }
 .main-layout.dark .user-name { color: #e0e0e0; }
