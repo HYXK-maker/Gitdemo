@@ -13,6 +13,7 @@ public class User {
     private String avatar;
     private Integer status;
     private String phone;
+    private String role;
     private LocalDateTime createTime;
     private LocalDateTime updateTime;
 }

@@ -7,11 +7,17 @@ export const useUserStore = defineStore('user', () => {
   const token = ref(localStorage.getItem('token') || '')
   const userId = ref(localStorage.getItem('userId') || '')
   const username = ref(localStorage.getItem('username') || '')
+  const role = ref(localStorage.getItem('role') || '')
   const currentUser = ref(JSON.parse(localStorage.getItem('currentUser') || 'null'))
 
   async function loginAction(form) {
     try {
       const data = await apiLogin(form)
+
+      // 检查后端返回的 code，如果非 200，显示错误消息
+      if (data && data.code && data.code !== 200) {
+        throw new Error(data.msg || '登录失败')
+      }
 
       if (data && data.token) {
         token.value = data.token
@@ -22,11 +28,16 @@ export const useUserStore = defineStore('user', () => {
           localStorage.setItem('userId', data.userId.toString())
         }
 
+        if (data.role) {
+          role.value = data.role
+          localStorage.setItem('role', data.role)
+        }
+
         const name = data.username || form.username
         username.value = name
         localStorage.setItem('username', name)
 
-        currentUser.value = { username: name }
+        currentUser.value = { username: name, role: data.role }
         localStorage.setItem('currentUser', JSON.stringify(currentUser.value))
 
         return true
@@ -43,12 +54,14 @@ export const useUserStore = defineStore('user', () => {
     token.value = ''
     userId.value = ''
     username.value = ''
+    role.value = ''
     currentUser.value = null
     localStorage.removeItem('token')
     localStorage.removeItem('userId')
     localStorage.removeItem('username')
+    localStorage.removeItem('role')
     localStorage.removeItem('currentUser')
   }
 
-  return { token, userId, username, currentUser, loginAction, logout }
+  return { token, userId, username, role, currentUser, loginAction, logout }
 })

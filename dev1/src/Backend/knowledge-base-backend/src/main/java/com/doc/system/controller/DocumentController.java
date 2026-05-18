@@ -112,4 +112,11 @@ public class DocumentController {
         String versionNote = params.get("versionNote");
         return versionService.createVersion(docId, content, userId, versionNote);
     }
+    @DeleteMapping("/versions/{versionId}")
+    public Map<String, Object> deleteVersion(@PathVariable Long versionId) {
+        versionService.deleteVersion(versionId);
+        Map<String, Object> result = new HashMap<>();
+        result.put("success", true);
+        return result;
+    }
 }

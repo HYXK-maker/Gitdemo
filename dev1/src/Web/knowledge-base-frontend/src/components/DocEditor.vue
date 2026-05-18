@@ -1,178 +1,163 @@
 <template>
   <div class="doc-editor">
-    <div v-if="loading" class="loading">
-      <el-skeleton :rows="8" animated />
+    <div class="editor-toolbar">
+      <input
+        v-model="title"
+        class="doc-title-input"
+        placeholder="文档标题"
+        @blur="saveTitle"
+        @keyup.enter="saveTitle"
+      />
+      <div class="toolbar-right">
+        <el-button size="small" @click="saveVersion" :loading="savingVersion">
+          保存版本
+        </el-button>
+        <span class="save-status">{{ saveStatus }}</span>
+      </div>
     </div>
-    <template v-else-if="doc">
-      <div class="toolbar">
-        <h2 class="doc-title" v-if="!editingTitle">
-          <span>{{ doc.title || '未命名文档' }}</span>
-          <el-button text size="small" @click="startEditTitle">✏️</el-button>
-        </h2>
-        <el-input
-          v-else
-          v-model="titleDraft"
-          class="title-input"
-          placeholder="输入文档标题"
-          @blur="saveTitle"
-          @keyup.enter="saveTitle"
-          ref="titleInputRef"
-        />
-        <div class="actions">
-          <el-button type="primary" @click="handleSave" :loading="saving">
-            保存
-          </el-button>
-        </div>
-      </div>
-
-      <div class="editor-body">
-        <QuillEditor
-          v-model:content="content"
-          content-type="html"
-          theme="snow"
-          :toolbar="toolbarOptions"
-          style="height: 100%"
-        />
-        />
-      </div>
-    </template>
-    <div v-else class="error">
-      <el-result icon="error" title="文档加载失败" sub-title="请检查文档是否存在或重试" />
+    <div class="editor-wrapper">
+      <QuillEditor
+        v-model:content="content"
+        theme="snow"
+        contentType="html"
+        toolbar="full"
+        @update:content="onContentChange"
+      />
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, watch, nextTick } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ref, watch, onBeforeUnmount } from 'vue'
 import { QuillEditor } from '@vueup/vue-quill'
 import 'quill/dist/quill.snow.css'
-import { getDocDetail, updateDoc, createDocVersion } from '@/api/doc'
+import { getDocDetail, saveDoc, renameDoc, createDocVersion } from '@/api/doc'
+import { ElMessage, ElMessageBox } from 'element-plus'
 
 const props = defineProps({
   docId: {
-    type: [String, Number],
-    required: true
+    type: [Number, String],
+    default: null
   }
 })
 
 const emit = defineEmits(['doc-updated'])
 
-const doc = ref(null)
+const title = ref('')
 const content = ref('')
-const titleDraft = ref('')
-const editingTitle = ref(false)
-const titleInputRef = ref(null)
-const loading = ref(false)
-const saving = ref(false)
+const saveStatus = ref('已保存')
+const savingVersion = ref(false)
+let saveTimer = null
 
-const toolbarOptions = [
-  ['bold', 'italic', 'underline', 'strike'],
-  [{ 'header': 1 }, { 'header': 2 }],
-  [{ 'list': 'ordered' }, { 'list': 'bullet' }],
-  [{ 'color': [] }, { 'background': [] }],
-  ['blockquote', 'code-block'],
-  ['clean']
-]
-
-async function loadDoc() {
-  if (!props.docId) return
-  loading.value = true
+watch(() => props.docId, async (newId) => {
+  if (!newId) {
+    title.value = ''
+    content.value = ''
+    saveStatus.value = ''
+    return
+  }
   try {
-    const res = await getDocDetail(props.docId)
-    doc.value = res.data || res
-    content.value = doc.value.content || ''
-    titleDraft.value = doc.value.title || ''
-  } catch (err) {
+    const doc = await getDocDetail(newId)
+    title.value = doc.title || ''
+    content.value = doc.content || ''
+    saveStatus.value = '已加载'
+  } catch (e) {
     ElMessage.error('加载文档失败')
-    doc.value = null
-  } finally {
-    loading.value = false
   }
-}
+}, { immediate: true })
 
-async function handleSave() {
-  if (!doc.value) return
-  saving.value = true
-  try {
-    await updateDoc(props.docId, {
-      title: titleDraft.value || doc.value.title,
-      content: content.value
-    })
-
+function onContentChange() {
+  if (!props.docId) return
+  saveStatus.value = '未保存...'
+  if (saveTimer) clearTimeout(saveTimer)
+  saveTimer = setTimeout(async () => {
     try {
-      await createDocVersion(props.docId, {
-        content: content.value,
-        versionNote: '保存于 ' + new Date().toLocaleString()
-      })
+      await saveDoc({ id: props.docId, content: content.value })
+      saveStatus.value = '已保存'
     } catch (e) {
-      console.error('创建版本失败:', e)
+      saveStatus.value = '保存失败'
+      ElMessage.error('自动保存失败，请重试')
     }
-
-    ElMessage.success('保存成功')
-    emit('doc-updated')
-  } catch (err) {
-    console.error('保存失败:', err)
-    ElMessage.error('保存失败，请重试')
-  } finally {
-    saving.value = false
-  }
-}
-function startEditTitle() {
-  titleDraft.value = doc.value.title || ''
-  editingTitle.value = true
-  nextTick(() => {
-    titleInputRef.value?.focus()
-  })
+  }, 2000)
 }
 
 async function saveTitle() {
-  editingTitle.value = false
-  doc.value.title = titleDraft.value
+  if (!props.docId || !title.value.trim()) return
   try {
-    await updateDoc(props.docId, {
-      title: titleDraft.value,
-      content: content.value
-    })
-    ElMessage.success('标题已保存')
+    await renameDoc(props.docId, title.value)
     emit('doc-updated')
-  } catch {
+    ElMessage.success('标题已保存')
+  } catch (e) {
     ElMessage.error('标题保存失败')
   }
 }
 
-watch(() => props.docId, (newId) => {
-  if (newId) loadDoc()
-  else doc.value = null
-}, { immediate: true })
+async function saveVersion() {
+  if (!props.docId) return
+  try {
+    const { value: versionNote } = await ElMessageBox.prompt('请输入版本说明（可选）', '保存版本', {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      inputPlaceholder: '例如：完成初稿'
+    })
+    savingVersion.value = true
+    // 先确保最新内容已保存
+    await saveDoc({ id: props.docId, content: content.value })
+    // 创建版本快照
+    await createDocVersion(props.docId, {
+      content: content.value,
+      versionNote: versionNote || ''
+    })
+    emit('doc-updated')  // 刷新版本面板
+    ElMessage.success('版本已保存')
+  } catch (e) {
+    if (e !== 'cancel') {
+      ElMessage.error('保存版本失败')
+    }
+  } finally {
+    savingVersion.value = false
+  }
+}
+
+onBeforeUnmount(() => {
+  if (saveTimer) clearTimeout(saveTimer)
+})
 </script>
 
 <style scoped>
 .doc-editor {
+  height: 100%;
   display: flex;
   flex-direction: column;
-  height: 100%;
   background: #fff;
-  border-radius: 8px;
-  overflow: hidden;
-  transition: background 0.3s;
 }
-.loading { padding: 32px; }
-.toolbar {
+.editor-toolbar {
+  padding: 12px 16px;
+  border-bottom: 1px solid #e8eef2;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.doc-title-input {
+  flex: 1;
+  font-size: 18px;
+  font-weight: bold;
+  border: none;
+  outline: none;
+  background: transparent;
+}
+.toolbar-right {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 12px 20px;
-  border-bottom: 1px solid #ebeef5;
-  flex-shrink: 0;
-  transition: border-color 0.3s;
+  gap: 12px;
 }
-.doc-title { font-size: 18px; font-weight: 600; margin: 0; }
-.title-input { max-width: 300px; }
-.editor-body {
+.save-status {
+  font-size: 12px;
+  color: #909399;
+  white-space: nowrap;
+}
+.editor-wrapper {
   flex: 1;
   overflow: hidden;
-  min-height: 0;
 }
-.error { padding: 40px; }
 </style>

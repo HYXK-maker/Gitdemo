@@ -13,18 +13,24 @@
           class="version-item"
           @click="previewVersion(ver)"
         >
-
           <div class="version-num">v{{ versions.length - index }}</div>
           <div class="version-time">{{ formatTime(ver.createTime) }}</div>
           <div class="version-note" v-if="ver.versionNote">{{ ver.versionNote }}</div>
+          <el-button
+            class="delete-btn"
+            size="small"
+            type="danger"
+            text
+            @click.stop="handleDelete(ver)"
+          >
+            删除
+          </el-button>
         </div>
       </div>
     </div>
 
-
     <el-dialog v-model="previewVisible" title="版本详情" width="700px" top="5vh">
       <div class="preview-header">
-        <!-- 预览弹窗中也用索引计算版本号 -->
         <span>版本 v{{ getCurrentPreviewVersion() }}</span>
         <span class="preview-time">{{ formatTime(currentPreview?.createTime) }}</span>
       </div>
@@ -38,9 +44,9 @@
 </template>
 
 <script setup>
-import { ref, watch, computed } from 'vue'
+import { ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { getDocVersions } from '@/api/doc'
+import { getDocVersions, deleteVersion } from '@/api/doc'
 
 const props = defineProps({ docId: [Number, String] })
 const emit = defineEmits(['restore'])
@@ -54,14 +60,11 @@ const loadVersions = async () => {
   try {
     const res = await getDocVersions(props.docId)
     let list = Array.isArray(res) ? res : (res.data || [])
-
-    // 按创建时间升序排列（最旧的在前，最新的在后）
     list.sort((a, b) => {
       const timeA = new Date(a.createTime || a.create_time || 0).getTime()
       const timeB = new Date(b.createTime || b.create_time || 0).getTime()
       return timeA - timeB
     })
-
     versions.value = list
   } catch (e) {
     console.error('加载版本列表失败:', e)
@@ -84,12 +87,10 @@ function previewVersion(ver) {
   previewVisible.value = true
 }
 
-// 获取当前预览版本的版本号
 function getCurrentPreviewVersion() {
   if (!currentPreview.value) return '?'
   const index = versions.value.findIndex(v => v.id === currentPreview.value.id)
   if (index === -1) return '?'
-  // 版本号 = 总数量 - 当前索引
   return versions.value.length - index
 }
 
@@ -107,6 +108,24 @@ function restoreVersion(ver) {
       ElMessage.success(`已恢复到版本 v${versionNum}，请保存`)
     })
     .catch(() => {})
+}
+
+async function handleDelete(ver) {
+  try {
+    const versionNum = versions.value.length - versions.value.findIndex(v => v.id === ver.id)
+    await ElMessageBox.confirm(`确定删除版本 v${versionNum}？`, '警告', {
+      type: 'warning',
+      confirmButtonText: '确定删除',
+      cancelButtonText: '取消'
+    })
+    await deleteVersion(ver.id)
+    ElMessage.success('版本已删除')
+    await loadVersions()
+  } catch (e) {
+    if (e !== 'cancel') {
+      ElMessage.error('删除失败')
+    }
+  }
 }
 
 function formatTime(time) {
@@ -150,6 +169,7 @@ function formatTime(time) {
 .panel-body { flex: 1; overflow-y: auto; }
 .version-list { padding: 8px; }
 .version-item {
+  position: relative;
   padding: 10px 8px;
   border-bottom: 1px solid #ebeef5;
   cursor: pointer;
@@ -160,6 +180,14 @@ function formatTime(time) {
 .version-num { font-size: 14px; font-weight: 600; color: #409eff; }
 .version-time { font-size: 12px; color: #909399; margin-top: 4px; }
 .version-note { font-size: 12px; color: #606266; margin-top: 2px; }
+.delete-btn {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  padding: 2px 6px;
+  font-size: 12px;
+}
 .empty { padding: 20px; text-align: center; color: #909399; }
 
 .preview-header {

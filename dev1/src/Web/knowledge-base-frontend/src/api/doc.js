@@ -19,29 +19,30 @@ export function saveDoc(data) {
   })
 }
 
+export function updateDoc(id, data) {
+  return request.put(`/doc/${id}`, data)
+}
+
 export function renameDoc(id, title) {
-  return request.post('/doc/rename', {id, title})
+  return request.post('/doc/rename', { id, title })
 }
 
 export function deleteDoc(id) {
-  return request.post('/doc/delete', {id})
+  return request.post('/doc/delete', { id })
 }
 
 export function getDocVersions(docId) {
   return request.get(`/doc/${docId}/versions`)
 }
 
-export function getVersionContent(versionId) {
-  return request.get(`/doc/versions/${versionId}`)
-}
-
 export function createDocVersion(docId, data) {
-  return request.post(`/doc/${docId}/version`, {
-    content: data.content,
-    versionNote: data.versionNote || ''
-  })
+  return request.post(`/doc/${docId}/version`, data)
 }
 
-export function updateDoc(id, data) {
-  return request.post('/doc/update', {id, ...data})
+export function deleteVersion(versionId) {
+  return request.delete(`/doc/versions/${versionId}`)
+}
+
+export function rollbackVersion(docId, versionNum) {
+  return request.post(`/doc/${docId}/rollback`, { versionNum })
 }

@@ -19,6 +19,10 @@ public class UserService {
         if (!user.getPassword().equals(password)) {
             throw new RuntimeException("密码错误");
         }
+        // 检查账号是否被禁用（status=1 表示禁用）
+        if (user.getStatus() != null && user.getStatus() == 1) {
+            throw new RuntimeException("账号已被禁用");
+        }
         return "login-success-token-" + user.getId();
     }
 
@@ -27,11 +31,14 @@ public class UserService {
         if (existingUser != null) {
             throw new RuntimeException("用户名已存在");
         }
-
         User user = new User();
         user.setUsername(username);
         user.setPassword(password);
-
+        // status 使用数据库默认值 0（正常）
         userMapper.insert(user);
+    }
+
+    public User findById(Long id) {
+        return userMapper.findById(id);
     }
 }

@@ -35,16 +35,25 @@ public class AuthController {
     @PostMapping("/api/auth/login")
     public ResponseEntity<Map<String, Object>> login(@RequestBody Map<String, String> user) {
         String url = dbServiceUrl + "/api/user/login";
-        // 8080 登录接口返回 JSON 对象，包含 data 字段
         Map<String, Object> result = restTemplate.postForObject(url, user, Map.class);
+        // 检查8080返回的code是否为200
+        if (result != null && result.get("code") != null && !result.get("code").equals(200)) {
+            // 直接透传错误信息给前端
+            return ResponseEntity.ok(result);
+        }
         String token = null;
         Long userId = null;
-        if (result != null && result.get("data") != null) {
-            token = result.get("data").toString();
-            // token格式: "login-success-token-2"
-            if (token.startsWith("login-success-token-")) {
-                String idPart = token.substring("login-success-token-".length());
-                userId = Long.valueOf(idPart);
+        String role = "user";
+        if (result != null) {
+            if (result.get("data") != null) {
+                token = result.get("data").toString();
+                if (token.startsWith("login-success-token-")) {
+                    String idPart = token.substring("login-success-token-".length());
+                    userId = Long.valueOf(idPart);
+                }
+            }
+            if (result.get("role") != null) {
+                role = result.get("role").toString();
             }
         }
         Map<String, Object> response = new HashMap<>();
@@ -52,6 +61,7 @@ public class AuthController {
         response.put("msg", "登录成功");
         response.put("token", token);
         response.put("userId", userId);
+        response.put("role", role);
         return ResponseEntity.ok(response);
     }
 }

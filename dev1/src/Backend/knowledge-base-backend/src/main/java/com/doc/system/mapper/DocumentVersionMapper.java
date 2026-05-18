@@ -2,7 +2,6 @@ package com.doc.system.mapper;
 
 import com.doc.system.entity.DocumentVersion;
 import org.apache.ibatis.annotations.*;
-
 import java.util.List;
 
 @Mapper
@@ -21,4 +20,7 @@ public interface DocumentVersionMapper {
             "VALUES (#{docId}, #{content}, #{versionNum}, #{operatorId}, #{versionNote}, NOW())")
     @Options(useGeneratedKeys = true, keyProperty = "id")
     int insert(DocumentVersion version);
+
+    @Delete("DELETE FROM document_version WHERE id = #{id}")
+    int deleteById(Long id);
 }

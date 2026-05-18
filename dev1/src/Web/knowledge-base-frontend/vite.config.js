@@ -13,17 +13,21 @@ export default defineConfig({
     port: 3000,
     historyApiFallback: true,
     proxy: {
-      '/api/auth': {
-        target: 'http://localhost:8081',
-        changeOrigin: true,
+      '/api/admin': {
+        target: 'http://localhost:8080',
+        changeOrigin: true
       },
       '/api/dir': {
         target: 'http://localhost:8080',
-        changeOrigin: true,
+        changeOrigin: true
       },
       '/api/doc': {
         target: 'http://localhost:8080',
-        changeOrigin: true,
+        changeOrigin: true
+      },
+      '/api': {
+        target: 'http://localhost:8081',
+        changeOrigin: true
       }
     }
   }

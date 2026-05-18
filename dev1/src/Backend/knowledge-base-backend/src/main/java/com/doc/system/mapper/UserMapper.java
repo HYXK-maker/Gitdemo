@@ -1,19 +1,16 @@
 package com.doc.system.mapper;
 
 import com.doc.system.entity.User;
-import org.apache.ibatis.annotations.Insert;
-import org.apache.ibatis.annotations.Options;
-import org.apache.ibatis.annotations.Select;
-import org.springframework.stereotype.Repository;
+import org.apache.ibatis.annotations.Mapper;
+import java.util.List;
 
-@Repository
+@Mapper
 public interface UserMapper {
-
-    @Select("select * from user where username = #{username}")
     User findByUsername(String username);
-
-    // 添加插入用户的方法
-    @Insert("insert into user(username, password) values(#{username}, #{password})")
-    @Options(useGeneratedKeys = true, keyProperty = "id")
+    User findById(Long id);
     int insert(User user);
+    List<User> findAll();
+    int updateRole(Long id, String role);
+    int updateStatus(Long id, Integer status);
+    int deleteById(Long id);
 }

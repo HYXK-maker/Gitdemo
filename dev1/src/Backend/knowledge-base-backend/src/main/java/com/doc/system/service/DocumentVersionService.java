@@ -34,4 +34,8 @@ public class DocumentVersionService {
         versionMapper.insert(version);
         return version;
     }
+
+    public void deleteVersion(Long id) {
+        versionMapper.deleteById(id);
+    }
 }
